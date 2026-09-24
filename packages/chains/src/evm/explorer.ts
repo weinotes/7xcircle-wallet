@@ -146,6 +146,21 @@ class ExplorerCoverageError extends Error {
   }
 }
 
+/**
+ * Runtime Etherscan-V2 API key — browsers cannot read process.env and
+ * bundlers differ, so apps call setExplorerApiKey(...) at startup (e.g.
+ * from import.meta.env) instead of relying on the build-time probe.
+ */
+let runtimeApiKey: string | undefined;
+
+export function setExplorerApiKey(key: string | undefined): void {
+  runtimeApiKey = key && key.length > 0 ? key : undefined;
+}
+
+export function getExplorerApiKey(): string | undefined {
+  return runtimeApiKey;
+}
+
 /** Thin queue to rate-limit concurrent explorer calls */
 class RateLimiter {
   private readonly minInterval: number;
@@ -180,7 +195,7 @@ export class ExplorerClient {
 
   constructor(opts: ExplorerClientOptions) {
     this.endpoint = resolveExplorerApi(opts.explorerUrl);
-    this.apiKey = opts.apiKey;
+    this.apiKey = opts.apiKey ?? runtimeApiKey;
     this.limiter = new RateLimiter(opts.rateLimitRps ?? 4);
     this.timeoutMs = opts.timeoutMs ?? 15_000;
     this.chainIdDecimal = opts.chainIdDecimal;

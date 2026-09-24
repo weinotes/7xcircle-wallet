@@ -13,22 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// MUST stay the first import: patches globalThis.Buffer before any module
-// that touches Buffer at top level (spl-token via @open-wallet/chains).
-import './polyfills.js';
-import './setup.js';
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
-import App from './App.js';
-import './styles/globals.css';
-import '@open-wallet/ui/src/tokens.css';
-import './i18n/index.js';
+/**
+ * Startup wiring shared by web + extension entries (import AFTER polyfills).
+ *
+ * Etherscan API V2 is the only reliable browser-safe source of EVM tx
+ * history since the legacy per-chain domains killed CORS; it needs a free
+ * personal API key. Without one the explorer quietly degrades (no history).
+ */
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </React.StrictMode>,
-);
+import { setExplorerApiKey } from '@open-wallet/chains';
+
+interface EnvLike {
+  VITE_EXPLORER_API_KEY?: string;
+}
+
+const env: EnvLike =
+  (import.meta as unknown as { env?: EnvLike }).env ?? {};
+
+setExplorerApiKey((env.VITE_EXPLORER_API_KEY ?? '').trim() || undefined);
+
+export {};

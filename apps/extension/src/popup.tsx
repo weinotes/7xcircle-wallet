@@ -21,18 +21,16 @@
  * has no URL to navigate — so we mount a MemoryRouter instead.
  */
 
+// MUST stay the first import: patches globalThis.Buffer before any module
+// touches Buffer at top level (spl-token via @open-wallet/chains).
+import '@web/polyfills.js';
+import '@web/setup.js';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import '@web/styles/globals.css';
 import '@open-wallet/ui/src/tokens.css';
 import '@web/i18n/index.js';
-
-// Buffer polyfill — bip39 needs Node's Buffer global in browser context.
-import { Buffer } from 'buffer';
-if (typeof globalThis.Buffer === 'undefined') {
-  (globalThis as { Buffer: typeof Buffer }).Buffer = Buffer;
-}
 
 import AppShell from './AppShell.js';
 
