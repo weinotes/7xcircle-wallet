@@ -11,8 +11,8 @@
 ## 功能特性
 
 - HD 钱包创建 / 导入（BIP39 助记词 + 私钥）
-- 多链统一资产管理：Ethereum、BNB Chain、Polygon、Arbitrum、Optimism、Base、Avalanche、Solana
-- 原生代币 + ERC20/BEP20/SPL 代币余额与转账
+- 多链统一资产管理：Ethereum、BNB Chain、Polygon、Arbitrum、Optimism、Base、Avalanche、Solana、TRON
+- 原生代币 + ERC20/BEP20/SPL/TRC20 代币余额与转账
 - 原生币发送，动态 Gas 估算（慢 / 中 / 快 / 自定义）
 - 区块浏览器 API 查询交易历史
 - 加密保险库：AES-256-GCM + PBKDF2-SHA512（20 万次迭代）
@@ -41,7 +41,7 @@ open-wallet/
 │   └── mobile/       # Android 应用（Expo / React Native）
 ├── packages/
 │   ├── core/         # 钱包核心：密钥、保险库加密、会话、链抽象
-│   ├── chains/       # 链适配器（EVM / Solana）
+│   ├── chains/       # 链适配器（EVM / Solana / TRON）
 │   ├── ui/           # 共享 UI 组件
 │   ├── shared/       # 共享类型、工具函数、常量
 │   └── storage/      # 跨平台加密存储抽象
@@ -88,7 +88,7 @@ Solana 移动端页面正在接入共享链适配器。
 ## 路线图
 
 - Phase 1（当前）：MVP — 多链收发、加密保险库、Web 应用
-- Phase 2：移动端（React Native）与桌面端（Tauri）、硬件钱包（Ledger）、NFT 视图、更多链（Tron、Bitcoin 及 PSBT 支持）
+- Phase 2：移动端（React Native）与桌面端（Tauri）、硬件钱包（Ledger）、NFT 视图、更多链（Bitcoin 及 PSBT 支持）
 - Phase 3：DeFi — DApp 浏览器、Swap 聚合、质押、WalletConnect v2
 
 ## 许可证

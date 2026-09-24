@@ -23,6 +23,7 @@
     "clean": true
   },
   "dependencies": {
+    "@noble/curves": "^1.8.0",
     "@noble/hashes": "^1.6.0",
     "@open-wallet/core": "workspace:*",
     "@open-wallet/shared": "workspace:*",

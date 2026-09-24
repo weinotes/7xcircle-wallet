@@ -19,7 +19,7 @@
  */
 
 /** Supported chain types */
-export type ChainType = 'evm' | 'solana' | 'utxo' | 'cosmos';
+export type ChainType = 'evm' | 'solana' | 'tron' | 'utxo' | 'cosmos';
 
 /** Password strength result */
 export interface PasswordStrength {
@@ -95,7 +95,7 @@ export type TxIntent =
   | { kind: 'native-transfer'; to: string; amountRaw: string }
   | {
       kind: 'token-transfer';
-      token: string;          // ERC20 contract address / SPL mint
+      token: string;          // ERC20 contract address / SPL mint / TRC20 contract (hex or base58)
       decimals: number;       // required by SPL transferChecked
       to: string;
       amountRaw: string;
@@ -130,6 +130,21 @@ export type UnsignedTx =
       recentBlockhash: string;
       /** Lets callers detect blockhash expiry and rebuild */
       lastValidBlockHeight: number;
+    }
+  | {
+      chainType: 'tron';
+      chainId: string;
+      /**
+       * Exact protobuf bytes of Transaction.raw_data, hex-encoded (no 0x).
+       * The signature is ECDSA(secp256k1, sha256(rawDataBytes)) — the byte
+       * sequence signed MUST be byte-identical to what gets serialized
+       * into the broadcasted Transaction, so it is carried verbatim here.
+       */
+      rawDataHex: string;
+      /** Transaction id = sha256(rawDataBytes), hex (no 0x). Also the explorer hash. */
+      txId: string;
+      /** Millis epoch after which the node rejects the tx (TAPOS expiry) */
+      expiration: number;
     };
 
 /** Signed transaction ready for broadcast */

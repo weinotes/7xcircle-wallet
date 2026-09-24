@@ -16,10 +16,13 @@
 export * from './configs.js';
 export * from './evm/adapter.js';
 export * from './solana/adapter.js';
+export * from './tron/adapter.js';
+export * from './tron/address.js';
 
 import { chainRegistry } from '@open-wallet/core';
 import { EvmAdapter } from './evm/adapter.js';
 import { SolanaAdapter } from './solana/adapter.js';
+import { TronAdapter } from './tron/adapter.js';
 import { CHAIN_CONFIGS, withRpcOverride } from './configs.js';
 
 /**
@@ -35,6 +38,8 @@ export function registerAllChains(): void {
       chainRegistry.register(new EvmAdapter(effective));
     } else if (effective.type === 'solana') {
       chainRegistry.register(new SolanaAdapter(effective));
+    } else if (effective.type === 'tron') {
+      chainRegistry.register(new TronAdapter(effective));
     }
   }
 }

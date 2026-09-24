@@ -165,6 +165,36 @@ export const CHAIN_CONFIGS: ChainConfig[] = [
     bip44Path: "m/44'/501'/0'",
     icon: 'solana',
   },
+  {
+    chainId: 'tron-227',
+    name: 'TRON',
+    type: 'tron',
+    nativeSymbol: 'TRX',
+    nativeDecimals: 6,
+    // TronGrid is the de-facto public fullnode cluster; keyless access is
+    // rate-limited (per IP) on /wallet, and /v1 data endpoints need a free
+    // API key — see TronAdapter.setGridApiKey.
+    rpcs: [
+      'https://api.trongrid.io',
+    ],
+    explorer: 'https://tronscan.org',
+    bip44Path: "m/44'/195'/0'/0",
+    icon: 'tron',
+  },
+  {
+    chainId: 'tron-nile',
+    name: 'TRON Nile',
+    type: 'tron',
+    nativeSymbol: 'TRX',
+    nativeDecimals: 6,
+    rpcs: [
+      'https://nile.trongrid.io',
+    ],
+    explorer: 'https://nile.tronscan.org',
+    bip44Path: "m/44'/195'/0'/0",
+    icon: 'tron',
+    testnet: true,
+  },
 ];
 
 /** Lookup config by chainId */
@@ -180,6 +210,11 @@ export function getEvmConfigs(): ChainConfig[] {
 /** Get all Solana chain configs */
 export function getSolanaConfigs(): ChainConfig[] {
   return CHAIN_CONFIGS.filter(c => c.type === 'solana');
+}
+
+/** Get all TRON chain configs */
+export function getTronConfigs(): ChainConfig[] {
+  return CHAIN_CONFIGS.filter(c => c.type === 'tron');
 }
 
 // ─── RPC overrides ───────────────────────────────────────────────────

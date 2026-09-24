@@ -11,8 +11,8 @@
 ## Features
 
 - HD wallet creation & import (BIP39 mnemonic + private key)
-- Multi-chain unified asset view: Ethereum, BNB Chain, Polygon, Arbitrum, Optimism, Base, Avalanche, Solana
-- Native + ERC20/BEP20/SPL token balances and transfers
+- Multi-chain unified asset view: Ethereum, BNB Chain, Polygon, Arbitrum, Optimism, Base, Avalanche, Solana, TRON
+- Native + ERC20/BEP20/SPL/TRC20 token balances and transfers
 - Send native tokens with dynamic gas estimation (slow / normal / fast / custom)
 - Transaction history via block explorer APIs
 - Encrypted vault: AES-256-GCM + PBKDF2-SHA512 (200,000 iterations)
@@ -41,7 +41,7 @@ open-wallet/
 │   └── mobile/       # Android app (Expo / React Native)
 ├── packages/
 │   ├── core/         # Wallet core: keys, vault encryption, session, chain abstraction
-│   ├── chains/       # Chain adapters (EVM / Solana)
+│   ├── chains/       # Chain adapters (EVM / Solana / TRON)
 │   ├── ui/           # Shared UI components
 │   ├── shared/       # Shared types, utils, constants
 │   └── storage/      # Cross-platform encrypted storage abstraction
@@ -90,7 +90,7 @@ See `TECH_DESIGN.md` for the full technical design and security audit checklist.
 ## Roadmap
 
 - Phase 1 (current): MVP — multi-chain send/receive, encrypted vault, web app
-- Phase 2: Mobile (React Native) & Desktop (Tauri), hardware wallet (Ledger), NFT view, more chains (Tron, Bitcoin with PSBT)
+- Phase 2: Mobile (React Native) & Desktop (Tauri), hardware wallet (Ledger), NFT view, more chains (Bitcoin with PSBT)
 - Phase 3: DeFi — DApp browser, swap aggregation, staking, WalletConnect v2
 
 ## License

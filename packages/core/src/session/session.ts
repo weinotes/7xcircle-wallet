@@ -114,7 +114,9 @@ function deriveAllAccounts(
     let privateKey: Uint8Array;
     let publicKey: Uint8Array;
 
-    if (config.type === 'evm') {
+    if (config.type === 'evm' || config.type === 'tron') {
+      // Tron is secp256k1/BIP32 exactly like EVM — only the path (m/44'/195')
+      // and the address encoding differ (handled by the chain adapter)
       privateKey = deriveEvmPrivateKey(mnemonic, derivationPath);
       publicKey = evmPublicKey(privateKey);
     } else if (config.type === 'solana') {
@@ -212,7 +214,7 @@ export function getPrivateKey(account: Account): Uint8Array {
 
   touchActivity();
 
-  if (config.type === 'evm') {
+  if (config.type === 'evm' || config.type === 'tron') {
     return deriveEvmPrivateKey(mnemonic, account.derivationPath);
   } else if (config.type === 'solana') {
     return deriveSolanaPrivateKey(mnemonic, account.derivationPath);
