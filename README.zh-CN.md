@@ -65,8 +65,9 @@ pnpm --filter @open-wallet/mobile android  # 在 Android 设备或模拟器运�
 Android 客户端使用 Expo / React Native，并复用同一套钱包核心和链适配器。
 加密后的 Vault 使用 Android SecureStore 保存。安装 Android Studio 和 SDK 后，
 执行 `pnpm --filter @open-wallet/mobile android` 即可构建并运行。
-当前移动端 MVP 支持创建/导入钱包、安全解锁、BNB 余额及原生 BNB 转账。
-Solana 移动端页面正在接入共享链适配器。
+当前移动端 MVP 支持创建/导入钱包、安全解锁、可选的指纹/面容解锁（密码缓存由
+Android Keystore 生物识别门锁保护，密码始终作为兜底通道）、BNB 余额及原生
+BNB 转账。Solana 移动端页面正在接入共享链适配器。
 
 ### 浏览器插件
 

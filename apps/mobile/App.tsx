@@ -14,6 +14,7 @@ import {
 import { CHAIN_CONFIGS, registerAllChains } from '@open-wallet/chains';
 import {
   createMnemonic,
+  decryptVault,
   encryptVault,
   evaluatePassword,
   getPrivateKey,
@@ -25,6 +26,14 @@ import {
 } from '@open-wallet/core';
 import { formatBalance, wipeBytes } from '@open-wallet/shared';
 import type { Account, VaultData } from '@open-wallet/shared';
+import {
+  inspectBiometrics,
+  isBiometricEnabled,
+  loadCachedPassword,
+  savePasswordForBiometrics,
+  clearBiometricCache,
+  type BiometricStatus,
+} from './src/biometric';
 
 const VAULT_KEY = 'open-wallet-mobile-vault';
 const ACTIVE_CHAIN = 'bsc-56';
@@ -40,6 +49,8 @@ export default function App() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [bioStatus, setBioStatus] = useState<BiometricStatus | null>(null);
+  const [bioEnabled, setBioEnabled] = useState(false);
 
   useEffect(() => {
     registerAllChains();
@@ -51,6 +62,8 @@ export default function App() {
         setScreen('welcome');
       }
     }).catch(() => setError('Unable to load the local wallet vault.'));
+    inspectBiometrics().then(setBioStatus).catch(() => setBioStatus({ usable: false, reason: 'Biometric check failed.' }));
+    isBiometricEnabled().then(setBioEnabled).catch(() => setBioEnabled(false));
   }, []);
 
   const startCreate = () => {
@@ -91,6 +104,9 @@ export default function App() {
     try {
       const nextVault = await encryptVault(mnemonic, password);
       await SecureStore.setItemAsync(VAULT_KEY, JSON.stringify(nextVault));
+      if (bioEnabled) {
+        await savePasswordForBiometrics(password).catch(() => undefined);
+      }
       const nextAccounts = await unlockSession(nextVault, password, CHAIN_CONFIGS);
       setVault(nextVault);
       setAccounts(nextAccounts);
@@ -110,10 +126,35 @@ export default function App() {
     setError('');
     try {
       setAccounts(await unlockSession(vault, password, CHAIN_CONFIGS));
+      // keep the biometric-cached password fresh on every password unlock —
+      // silently no-ops unless the user enabled biometrics
+      if (bioEnabled) {
+        await savePasswordForBiometrics(password).catch(() => undefined);
+      }
       setPassword('');
       setScreen('wallet');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Incorrect password.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Keystore-gated read of the cached password; failure → password form */
+  const unlockWithBiometric = async () => {
+    if (!vault) return;
+    setBusy(true);
+    setError('');
+    try {
+      const cached = await loadCachedPassword();
+      if (!cached) {
+        setError('Biometric unlock unavailable — use your password.');
+        return;
+      }
+      setAccounts(await unlockSession(vault, cached, CHAIN_CONFIGS));
+      setScreen('wallet');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unlock failed.');
     } finally {
       setBusy(false);
     }
@@ -135,22 +176,25 @@ export default function App() {
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>7xCircle Wallet</Text>
         <Text style={styles.subtitle}>Your keys. Your coins.</Text>
-        {screen === 'welcome' && <Welcome hasVault={Boolean(vault)} onCreate={startCreate} onImport={startImport} onUnlock={() => setScreen('password')} />}
+        {screen === 'welcome' && <Welcome hasVault={Boolean(vault)} bioOffer={bioEnabled && Boolean(vault) && Boolean(bioStatus?.usable)} onCreate={startCreate} onImport={startImport} onUnlock={() => setScreen('password')} onUnlockBiometric={unlockWithBiometric} />}
         {screen === 'create' && <Recovery mnemonic={mnemonic} onContinue={continueCreate} onBack={() => setScreen('welcome')} />}
         {screen === 'import' && <MnemonicInput value={mnemonic} onChange={setMnemonic} onContinue={continueImport} onBack={() => setScreen('welcome')} />}
         {screen === 'password' && <PasswordForm hasVault={Boolean(vault)} password={password} confirmPassword={confirmPassword} onPassword={setPassword} onConfirm={setConfirmPassword} onSubmit={vault ? unlock : saveAndUnlock} onBack={() => setScreen('welcome')} busy={busy} />}
-        {screen === 'wallet' && <Wallet accounts={accounts} onLock={lock} />}
+        {screen === 'wallet' && <Wallet accounts={accounts} onLock={lock} vault={vault} bioStatus={bioStatus} bioEnabled={bioEnabled} onBioChanged={(enabled) => setBioEnabled(enabled)} />}
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function Welcome({ hasVault, onCreate, onImport, onUnlock }: { hasVault: boolean; onCreate: () => void; onImport: () => void; onUnlock: () => void }) {
+function Welcome({ hasVault, bioOffer, onCreate, onImport, onUnlock, onUnlockBiometric }: { hasVault: boolean; bioOffer: boolean; onCreate: () => void; onImport: () => void; onUnlock: () => void; onUnlockBiometric: () => void }) {
   return <View style={styles.card}>
     <Text style={styles.heading}>{hasVault ? 'Wallet locked' : 'Create your wallet'}</Text>
     <Text style={styles.body}>The encrypted vault stays on this device. The recovery phrase is never uploaded.</Text>
-    {hasVault ? <Button label="Unlock wallet" onPress={onUnlock} /> : <Button label="Create new wallet" onPress={onCreate} />}
+    {hasVault ? <>
+      {bioOffer && <Button label="Unlock with fingerprint / face" onPress={onUnlockBiometric} />}
+      <Button label={bioOffer ? 'Use password instead' : 'Unlock wallet'} onPress={onUnlock} secondary={!bioOffer} />
+    </> : <Button label="Create new wallet" onPress={onCreate} />}
     <Button label="Import recovery phrase" onPress={onImport} secondary />
   </View>;
 }
@@ -182,7 +226,7 @@ function PasswordForm({ hasVault, password, confirmPassword, onPassword, onConfi
   </View>;
 }
 
-function Wallet({ accounts, onLock }: { accounts: Account[]; onLock: () => void }) {
+function Wallet({ accounts, onLock, vault, bioStatus, bioEnabled, onBioChanged }: { accounts: Account[]; onLock: () => void; vault: VaultData | null; bioStatus: BiometricStatus | null; bioEnabled: boolean; onBioChanged: (enabled: boolean) => void }) {
   const visible = accounts.filter(account => account.chainId === ACTIVE_CHAIN);
   const account = visible[0];
   const adapter = chainRegistry.get(ACTIVE_CHAIN);
@@ -248,8 +292,70 @@ function Wallet({ accounts, onLock }: { accounts: Account[]; onLock: () => void 
     <TextInput keyboardType="decimal-pad" value={amount} onChangeText={setAmount} placeholder="Amount" placeholderTextColor="#78818f" style={styles.input} />
     <Button label={sending ? 'Sending…' : 'Send'} onPress={send} disabled={sending} />
     {status ? <Text style={styles.status}>{status}</Text> : null}
+    <Security vault={vault} bioStatus={bioStatus} bioEnabled={bioEnabled} onBioChanged={onBioChanged} />
     <Button label="Lock wallet" onPress={onLock} secondary />
   </View>;
+}
+
+/**
+ * Biometric toggle. Enabling requires re-entering the password (proves
+ * knowledge NOW; the cached copy behind the Keystore gate was never touched
+ * by a merely-unlocked session). Disabling just wipes the cache — the
+ * password path remains, so funds can never be locked out by this setting.
+ */
+function Security({ vault, bioStatus, bioEnabled, onBioChanged }: { vault: VaultData | null; bioStatus: BiometricStatus | null; bioEnabled: boolean; onBioChanged: (enabled: boolean) => void }) {
+  const [showForm, setShowForm] = useState(false);
+  const [pwd, setPwd] = useState('');
+  const [msg, setMsg] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const enable = async () => {
+    if (!vault) return;
+    setSaving(true);
+    setMsg('');
+    try {
+      // verify knowledge of the password against the real vault — pure
+      // decrypt check, no session side effects
+      await decryptVault(vault, pwd);
+      await savePasswordForBiometrics(pwd);
+      wipeField(pwd, setPwd);
+      onBioChanged(true);
+      setShowForm(false);
+      setMsg('Biometric unlock enabled.');
+    } catch (cause) {
+      setMsg(cause instanceof Error ? `Failed: ${cause.message}` : 'Failed to enable.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const disable = async () => {
+    await clearBiometricCache().catch(() => undefined);
+    onBioChanged(false);
+    setMsg('Biometric unlock disabled — password unlock still available.');
+  };
+
+  return <View style={styles.account}>
+    <Text style={styles.section}>Biometric unlock</Text>
+    <Text style={styles.status}>
+      {bioEnabled ? 'On — fingerprint / face unlocks the wallet.'
+        : bioStatus && !bioStatus.usable ? bioStatus.reason
+        : 'Off. The password stays the master door; biometrics only speed up unlocking.'}
+    </Text>
+    {bioEnabled
+      ? <Button label="Turn off biometrics" onPress={disable} secondary />
+      : bioStatus?.usable && <Button label="Turn on biometrics" onPress={() => setShowForm(v => !v)} secondary />}
+    {showForm && <>
+      <TextInput secureTextEntry value={pwd} onChangeText={setPwd} placeholder="Current password to confirm" placeholderTextColor="#78818f" style={styles.input} />
+      <Button label={saving ? 'Saving…' : 'Confirm and enable'} onPress={enable} disabled={saving || pwd.length === 0} />
+    </>}
+    {msg ? <Text style={styles.status}>{msg}</Text> : null}
+  </View>;
+}
+
+/** RN TextInput state wipe helper (strings are immutable; best effort) */
+function wipeField(_value: string, setter: (v: string) => void): void {
+  setter('');
 }
 
 function Button({ label, onPress, secondary, disabled }: { label: string; onPress: () => void; secondary?: boolean; disabled?: boolean }) {

@@ -15,6 +15,7 @@
     "@open-wallet/core": "workspace:*",
     "@open-wallet/shared": "workspace:*",
     "expo": "~53.0.0",
+    "expo-local-authentication": "~16.0.5",
     "expo-secure-store": "~14.2.3",
     "expo-status-bar": "~2.2.3",
     "react": "19.0.0",

@@ -6,6 +6,10 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "scheme": "openwallet",
+    "plugins": [
+      "expo-local-authentication",
+      "expo-secure-store"
+    ],
     "android": {
       "package": "com.openwallet.app",
       "permissions": [],
