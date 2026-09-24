@@ -42,6 +42,8 @@ import { Button, Input, Modal } from '@open-wallet/ui';
 import { chainRegistry } from '@open-wallet/core';
 import { useWalletStore } from '../store/wallet.js';
 import { CHAIN_CONFIGS } from '@open-wallet/chains';
+import type { TokenSafety } from '@open-wallet/chains';
+import { fetchTokenSafety } from '@open-wallet/chains';
 import { formatBalance } from '@open-wallet/shared';
 import type { FeeTier, TokenBalance, TxIntent } from '@open-wallet/shared';
 import { useTxFlow } from '../hooks/useTxFlow.js';
@@ -74,6 +76,8 @@ export function Send() {
   const [tokenInfo, setTokenInfo] = useState<Erc20Info | null>(null);
   const [tokenInfoLoading, setTokenInfoLoading] = useState(false);
   const [tokenInfoError, setTokenInfoError] = useState<string | null>(null);
+  /** GoPlus honeypot/tax scan — advisory banner, null = no data */
+  const [tokenSafety, setTokenSafety] = useState<TokenSafety | null>(null);
 
   // Held tokens list (for dropdown selection), and manual-input toggle
   const [heldTokens, setHeldTokens] = useState<TokenBalance[]>([]);
@@ -221,6 +225,17 @@ export function Send() {
         const info = await adapter.getTokenInfo(erc20Address);
         if (cancelled) return;
         setTokenInfo({ ...info, address: erc20Address });
+        // GoPlus scan for EVM chains — advisory only, never blocks (false
+        // positives exist), but a honeypot flag must be LOUD
+        const decimal = CHAIN_CONFIGS.find(c => c.chainId === activeChainId)?.chainIdDecimal;
+        if (decimal !== undefined && ['56', '1', '137', '42161', '10', '8453', '43114'].includes(String(decimal))) {
+          setTokenSafety(null);
+          fetchTokenSafety(String(decimal) as '56', erc20Address)
+            .then(s => { if (!cancelled) setTokenSafety(s); })
+            .catch(() => undefined);
+        } else {
+          setTokenSafety(null);
+        }
       } catch {
         if (cancelled) return;
         setTokenInfo(null);
@@ -754,6 +769,28 @@ export function Send() {
               color: 'var(--ow-success)',
             }}>
               {t('send.tokenLoaded', { name: tokenInfo.name || tokenInfo.symbol, symbol: tokenInfo.symbol, decimals: tokenInfo.decimals })}
+            </div>
+          )}
+          {/* GoPlus advisory: red = concrete risks found, muted = no data */}
+          {tokenSafety && tokenSafety.warnings.length > 0 && (
+            <div style={{
+              fontSize: 'var(--ow-font-size-xs)',
+              color: 'var(--ow-danger)',
+              border: '1px solid var(--ow-danger)',
+              borderRadius: 'var(--ow-radius-sm, 8px)',
+              padding: '6px 8px',
+            }}>
+              ⚠️ {t('send.safetyRisks', { risks: tokenSafety.warnings.join(' · ') })}
+            </div>
+          )}
+          {tokenSafety && tokenSafety.warnings.length === 0 && (
+            <div style={{ fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-text-tertiary)' }}>
+              ✓ {t('send.safetyClean')}
+            </div>
+          )}
+          {!tokenSafety && !tokenInfoLoading && tokenInfo && (
+            <div style={{ fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-text-tertiary)' }}>
+              {t('send.safetyUnknown')}
             </div>
           )}
         </div>

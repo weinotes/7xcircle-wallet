@@ -20,6 +20,7 @@ export * from './solana/adapter.js';
 export * from './solana/jupiter.js';
 export * from './tron/adapter.js';
 export * from './tron/address.js';
+export * from './security/tokenscan.js';
 
 import { chainRegistry } from '@open-wallet/core';
 import { EvmAdapter } from './evm/adapter.js';
