@@ -31,6 +31,7 @@ import { getPrivateKey, isUnlocked, touchActivity } from '@open-wallet/core';
 import type { ChainAdapter } from '@open-wallet/core';
 import type {
   Account,
+  ExternalTx,
   FeeEstimate,
   FeeTier,
   TransactionRecord,
@@ -70,6 +71,12 @@ export interface UseTxFlowResult {
   /** Exact fee of the transaction that was broadcast */
   resolvedFee: FeeEstimate | null;
   send: (intent: TxIntent, meta: TxMeta) => Promise<void>;
+  /**
+   * Send a transaction built OUTSIDE the wallet (a Jupiter/0x aggregator
+   * quote). Same sign → broadcast → retry pipeline, only the build step
+   * differs: importExternalTransaction instead of buildTransaction.
+   */
+  sendExternal: (tx: ExternalTx, meta: TxMeta) => Promise<void>;
   reset: () => void;
 }
 
@@ -146,7 +153,14 @@ export function useTxFlow({
     setResolvedFee(null);
   }, []);
 
-  const send = useCallback(async (intent: TxIntent, meta: TxMeta) => {
+  /** Shared pipeline: build (via injected step) → sign → broadcast → wait.
+   *  Both the wallet-built (intent) and aggregator-built (external) paths
+   *  run through here so key lifetime stays identical. */
+  const runPipeline = useCallback(async (
+    build: () => Promise<UnsignedTx>,
+    meta: TxMeta,
+    allowRebuild: boolean,
+  ) => {
     if (!adapter || !account) {
       setError('Wallet not ready');
       setStatus('failed');
@@ -165,10 +179,7 @@ export function useTxFlow({
       try {
         // ── Build ──────────────────────────────────────────────────────
         setStatus('building');
-        const unsigned = await adapter.buildTransaction(intent, {
-          from: account.address,
-          feeTier,
-        });
+        const unsigned = await build();
 
         if (unsigned.chainType === 'evm') {
           // Derive the fee from the built transaction rather than calling
@@ -234,7 +245,7 @@ export function useTxFlow({
           return;
         }
 
-        if (outcome === 'expired' && attempt < MAX_ATTEMPTS) {
+        if (outcome === 'expired' && allowRebuild && attempt < MAX_ATTEMPTS) {
           // The blockhash died before inclusion — rebuild and try again
           continue;
         }
@@ -255,6 +266,32 @@ export function useTxFlow({
     }
   }, [adapter, account, chainId, feeTier, addPendingTx, removePendingTx]);
 
+  const send = useCallback(async (intent: TxIntent, meta: TxMeta) => {
+    // builder is only invoked after runPipeline's adapter/account guard
+    await runPipeline(
+      () => (adapter as ChainAdapter).buildTransaction(intent, {
+        from: (account as Account).address,
+        feeTier,
+      }),
+      meta,
+      // wallet-built txs get a fresh blockhash every attempt → retry works
+      true,
+    );
+  }, [adapter, account, feeTier, runPipeline]);
+
+  const sendExternal = useCallback(async (tx: ExternalTx, meta: TxMeta) => {
+    await runPipeline(
+      () => (adapter as ChainAdapter).importExternalTransaction(tx, {
+        from: (account as Account).address,
+        feeTier,
+      }),
+      meta,
+      // an aggregator quote is a FIXED payload — re-import cannot refresh
+      // its blockhash, so never re-broadcast an expired one; the UI re-quotes
+      false,
+    );
+  }, [adapter, account, feeTier, runPipeline]);
+
   // Locking the wallet mid-flight must not leave the UI in a spinning state
   useEffect(() => {
     if (!isUnlocked() && status !== 'idle' && status !== 'confirmed' && status !== 'failed') {
@@ -263,5 +300,5 @@ export function useTxFlow({
     }
   }, [status]);
 
-  return { status, txHash, error, resolvedFee, send, reset };
+  return { status, txHash, error, resolvedFee, send, sendExternal, reset };
 }
