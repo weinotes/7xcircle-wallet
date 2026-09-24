@@ -66,11 +66,12 @@ export default defineConfig({
       input: {
         popup: resolve(__dirname, 'popup.html'),
         background: resolve(__dirname, 'src/background.ts'),
+        content: resolve(__dirname, 'src/content.ts'),
       },
       output: {
         entryFileNames: (chunk) => {
           // background must be a top-level JS file for MV3 service worker
-          return chunk.name === 'background' ? 'background.js' : 'assets/[name].js';
+          return chunk.name === 'background' || chunk.name === 'content' ? `${chunk.name}.js` : 'assets/[name].js';
         },
         chunkFileNames: 'assets/[name].js',
         assetFileNames: 'assets/[name].[ext]',
@@ -78,4 +79,3 @@ export default defineConfig({
     },
   },
 });
-
