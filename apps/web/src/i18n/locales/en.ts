@@ -84,6 +84,7 @@ export default {
     swap: 'Swap',
     receive: 'Receive',
     history: 'History',
+    dappRequests: 'dApp requests',
     lock: 'Lock',
     sent: 'Sent',
     received: 'Received',
@@ -142,6 +143,9 @@ export default {
     tokenContractPlaceholder: '0x...',
     readingTokenInfo: 'Reading token info...',
     tokenLoaded: '✓ {{name}} ({{symbol}}) · {{decimals}} decimals',
+    safetyRisks: 'Token scan found risks: {{risks}}',
+    safetyClean: 'Token scan: no honeypot / high-tax / mint risks found',
+    safetyUnknown: 'Token scan has no data for this contract — verify before large transfers',
     from: 'From:',
     balance: 'Balance: {{amount}} {{symbol}}',
     gasHint: '· {{amount}} {{symbol}} for gas',
@@ -210,6 +214,17 @@ export default {
     useMint: 'Use',
     balance: 'Balance: {{balance}}',
     notEnoughBalance: 'Not enough {{symbol}} balance',
+  },
+
+  // ── dApp approvals ──
+  dapp: {
+    title: 'dApp requests',
+    none: 'No pending dApp requests.',
+    approve: 'Approve',
+    reject: 'Reject',
+    rejectAll: 'Reject all ({{count}})',
+    lockedNotice: 'Wallet is locked — unlock it or reject these requests.',
+    webUnsupported: 'dApp connections only work in the browser extension.',
   },
 
   // ── Settings ──

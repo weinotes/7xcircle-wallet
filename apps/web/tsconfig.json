@@ -4,6 +4,7 @@
     "outDir": "dist",
     "rootDir": "src",
     "jsx": "react-jsx",
+    "types": ["chrome", "vite/client", "react", "react-dom"],
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": false,

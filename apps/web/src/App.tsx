@@ -25,6 +25,7 @@ import { Swap } from './pages/Swap.js';
 import { Receive } from './pages/Receive.js';
 import { History } from './pages/History.js';
 import { Settings } from './pages/Settings.js';
+import { DappApprovals } from './pages/DappApprovals.js';
 import { useWalletStore } from './store/wallet.js';
 import { registerAllChains } from '@open-wallet/chains';
 import { touchActivity } from '@open-wallet/core';
@@ -111,6 +112,7 @@ function App() {
       <Route path="/receive" element={<Receive />} />
       <Route path="/history" element={<History />} />
       <Route path="/settings" element={<Settings />} />
+      <Route path="/dapp" element={<DappApprovals />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

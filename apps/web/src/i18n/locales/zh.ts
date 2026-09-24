@@ -84,6 +84,7 @@ export default {
     swap: '兑换',
     receive: '收款',
     history: '历史',
+    dappRequests: 'DApp 请求',
     lock: '锁定',
     sent: '发送',
     received: '接收',
@@ -142,6 +143,9 @@ export default {
     tokenContractPlaceholder: '0x...',
     readingTokenInfo: '读取代币信息中...',
     tokenLoaded: '✓ {{name}} ({{symbol}}) · {{decimals}} 位小数',
+    safetyRisks: '安全检测发现风险：{{risks}}',
+    safetyClean: '安全检测：未发现貔貅 / 高税 / 增发风险',
+    safetyUnknown: '安全检测无该合约数据——大额转账前请自行核实',
     from: '发件人:',
     balance: '余额: {{amount}} {{symbol}}',
     gasHint: '· {{amount}} {{symbol}} 用于 gas',
@@ -210,6 +214,17 @@ export default {
     useMint: '使用',
     balance: '余额：{{balance}}',
     notEnoughBalance: '{{symbol}} 余额不足',
+  },
+
+  // ── DApp 审批 ──
+  dapp: {
+    title: 'DApp 请求',
+    none: '暂无待处理的 DApp 请求。',
+    approve: '批准',
+    reject: '拒绝',
+    rejectAll: '全部拒绝（{{count}}）',
+    lockedNotice: '钱包已锁定——请先解锁，或拒绝这些请求。',
+    webUnsupported: 'DApp 连接仅在浏览器扩展中可用。',
   },
 
   // ── 设置 ──

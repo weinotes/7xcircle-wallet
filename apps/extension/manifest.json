@@ -39,6 +39,10 @@
   },
   "permissions": ["storage"],
   "host_permissions": [
+    "https://lite-api.jup.ag/*",
+    "https://api.trongrid.io/*",
+    "https://nile.trongrid.io/*",
+    "https://api.gopluslabs.io/*",
     "https://*.binance.org/*",
     "https://*.binance.org/*",
     "https://bsc-testnet.publicnode.com/*",

@@ -182,6 +182,9 @@ importers:
         specifier: ^5.0.0
         version: 5.0.15(@types/react@19.2.18)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
+      '@types/chrome':
+        specifier: ^0.0.270
+        version: 0.0.270
       '@types/react':
         specifier: ^19.0.0
         version: 19.2.18

@@ -35,7 +35,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Lock, Send, ArrowLeftRight, ArrowDownToLine, History as HistoryIcon, Settings, ArrowUpRight, ArrowDownLeft, Coins, RefreshCw } from 'lucide-react';
+import { Lock, Send, ArrowLeftRight, ArrowDownToLine, History as HistoryIcon, Settings, ArrowUpRight, ArrowDownLeft, Coins, RefreshCw, Plug } from 'lucide-react';
 import { Button } from '@open-wallet/ui';
 import { useWalletStore } from '../store/wallet.js';
 import { chainRegistry } from '@open-wallet/core';
@@ -304,6 +304,14 @@ export function Home() {
             <HistoryIcon size={20} /> {t('home.history')}
           </Button>
         </Link>
+        {/* dApp approvals only exist inside the extension popup */}
+        {typeof chrome !== 'undefined' && Boolean((chrome as unknown as { runtime?: { id?: string } }).runtime?.id) && (
+          <Link to="/dapp" style={{ textDecoration: 'none' }}>
+            <Button variant="secondary" style={{ width: '100%', flexDirection: 'column', padding: 'var(--ow-space-4)', gap: 'var(--ow-space-1)' }}>
+              <Plug size={20} /> {t('home.dappRequests')}
+            </Button>
+          </Link>
+        )}
         <Button
           variant="secondary"
           style={{ width: '100%', flexDirection: 'column', padding: 'var(--ow-space-4)', gap: 'var(--ow-space-1)' }}

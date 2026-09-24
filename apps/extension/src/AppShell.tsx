@@ -31,9 +31,11 @@ import { Onboarding } from '@web/pages/Onboarding.js';
 import { Unlock } from '@web/pages/Unlock.js';
 import { Home } from '@web/pages/Home.js';
 import { Send } from '@web/pages/Send.js';
+import { Swap } from '@web/pages/Swap.js';
 import { Receive } from '@web/pages/Receive.js';
 import { History } from '@web/pages/History.js';
 import { Settings } from '@web/pages/Settings.js';
+import { DappApprovals } from '@web/pages/DappApprovals.js';
 import { useWalletStore } from '@web/store/wallet.js';
 import { registerAllChains } from '@open-wallet/chains';
 import { touchActivity } from '@open-wallet/core';
@@ -104,6 +106,8 @@ function AppShell() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/send" element={<Send />} />
+      <Route path="/swap" element={<Swap />} />
+      <Route path="/dapp" element={<DappApprovals />} />
       <Route path="/receive" element={<Receive />} />
       <Route path="/history" element={<History />} />
       <Route path="/settings" element={<Settings />} />
