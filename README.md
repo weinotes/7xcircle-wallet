@@ -10,7 +10,8 @@
 
 ## Features
 
-- HD wallet creation & import (BIP39 mnemonic + private key)
+- HD wallet creation & import (BIP39 mnemonic; single private-key import planned)
+- Cross-wallet compatible accounts: the same mnemonic yields the same addresses as MetaMask / TokenPocket / Phantom / TronLink (locked in by interop tests)
 - Multi-chain unified asset view: Ethereum, BNB Chain, Polygon, Arbitrum, Optimism, Base, Avalanche, Solana, TRON
 - Native + ERC20/BEP20/SPL/TRC20 token balances and transfers
 - Send native tokens with dynamic gas estimation (slow / normal / fast / custom)
@@ -74,7 +75,8 @@ Build with `pnpm --filter @open-wallet/extension build`, then load
 `apps/extension/dist` as an unpacked extension in Chrome or another Chromium browser.
 The popup supports the wallet UI, and the injected EIP-1193 provider exposes the
 current BNB chain and read-only account discovery while transaction approval UI is
-being completed.
+being completed. The dApp-compatibility targets are MetaMask (EIP-1193 + EIP-6963),
+Phantom (`window.solana`) and TronLink/TokenPocket (`window.tronWeb`).
 
 Requires Node.js >= 20.19 and pnpm >= 9.
 
@@ -91,7 +93,7 @@ See `TECH_DESIGN.md` for the full technical design and security audit checklist.
 
 - Phase 1 (current): MVP — multi-chain send/receive, encrypted vault, web app
 - Phase 2: Mobile (React Native) & Desktop (Tauri), hardware wallet (Ledger), NFT view, more chains (Bitcoin with PSBT)
-- Phase 3: DeFi — DApp browser, swap aggregation, staking, WalletConnect v2
+- Phase 3: DeFi — DApp browser, swap aggregation, staking, WalletConnect v2, private-key import (EVM hex / Solana base58)
 
 ## License
 

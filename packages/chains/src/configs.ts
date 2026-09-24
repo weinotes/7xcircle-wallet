@@ -16,6 +16,13 @@
 /**
  * Chain configurations for all supported networks.
  * Each config includes RPC failover list, explorer URL, and BIP44 path.
+ *
+ * ⚠ EVM derivation-path compatibility rule: every EVM chain MUST use the
+ * coin-60 path (m/44'/60'/0'/0). MetaMask/TokenPocket/Trust hold one single
+ * EVM identity across all EVM chains — the SLIP-0044 native coins (714 BNB,
+ * 966 MATIC, 9000 AVAX…) are NOT used for EVM addresses anywhere, and a
+ * migrant importing their mnemonic would see EMPTY balances on those chains.
+ * Asset compat outranks coin-type purity.
  */
 
 import type { ChainConfig } from '@open-wallet/shared';
@@ -51,7 +58,7 @@ export const CHAIN_CONFIGS: ChainConfig[] = [
       'https://bsc.publicnode.com',
     ],
     explorer: 'https://bscscan.com',
-    bip44Path: "m/44'/714'/0'/0",
+    bip44Path: "m/44'/60'/0'/0",
     icon: 'binance',
   },
   {
@@ -68,7 +75,7 @@ export const CHAIN_CONFIGS: ChainConfig[] = [
       'https://data-seed-prebsc-2-s2.binance.org:8545',
     ],
     explorer: 'https://testnet.bscscan.com',
-    bip44Path: "m/44'/714'/0'/0",
+    bip44Path: "m/44'/60'/0'/0",
     icon: 'binance',
     testnet: true,
   },
@@ -85,7 +92,7 @@ export const CHAIN_CONFIGS: ChainConfig[] = [
       'https://polygon.publicnode.com',
     ],
     explorer: 'https://polygonscan.com',
-    bip44Path: "m/44'/966'/0'/0",
+    bip44Path: "m/44'/60'/0'/0",
     icon: 'polygon',
   },
   {
@@ -145,7 +152,7 @@ export const CHAIN_CONFIGS: ChainConfig[] = [
       'https://rpc.ankr.com/avalanche',
     ],
     explorer: 'https://snowtrace.io',
-    bip44Path: "m/44'/9000'/0'/0",
+    bip44Path: "m/44'/60'/0'/0",
     icon: 'avalanche',
   },
   {
