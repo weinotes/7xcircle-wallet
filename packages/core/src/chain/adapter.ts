@@ -26,12 +26,27 @@
 import type {
   Account,
   ChainConfig,
+  ExternalTx,
   FeeEstimate,
-  RawTransaction,
+  FeeTier,
   SignedTransaction,
   TokenBalance,
+  TokenInfo,
   TransactionRecord,
+  TxIntent,
+  UnsignedTx,
 } from '@open-wallet/shared';
+
+/** Options for building / estimating a transaction */
+export interface BuildOpts {
+  /**
+   * Sender address. The intent describes *what* to do; this says *who* does it.
+   * Required because gas/nonce/payer all depend on the sender.
+   */
+  from: string;
+  /** Fee speed tier — maps to each chain's own acceleration strategy */
+  feeTier?: FeeTier;
+}
 
 export interface ChainAdapter {
   /** Chain unique identifier (e.g. "bsc-56", "eth-1", "solana") */
@@ -64,16 +79,35 @@ export interface ChainAdapter {
 
   // ─── Transaction lifecycle ──────────────────────────────────────────
 
-  /** Build a raw unsigned transaction */
-  buildTransaction(params: RawTransaction): Promise<RawTransaction>;
+  /**
+   * Compile a semantic intent into an unsigned, ready-to-sign transaction.
+   *
+   * Chains translate the intent into their own native form — EVM fills
+   * nonce/gas/calldata, Solana compiles instructions into a v0 message and
+   * attaches a priority fee.
+   */
+  buildTransaction(intent: TxIntent, opts: BuildOpts): Promise<UnsignedTx>;
+
+  /**
+   * Wrap a transaction built elsewhere (an aggregator quote, a dApp request)
+   * so it can go through the normal sign/broadcast path.
+   */
+  importExternalTransaction(tx: ExternalTx, opts: BuildOpts): Promise<UnsignedTx>;
 
   /** Sign a transaction with the given private key */
   signTransaction(
-    rawTx: RawTransaction,
+    tx: UnsignedTx,
     privateKey: Uint8Array,
   ): Promise<SignedTransaction>;
 
-  /** Broadcast a signed transaction, returns tx hash */
+  /**
+   * Broadcast a signed transaction, returns tx hash.
+   *
+   * Broadcast only — does not wait for confirmation. Callers that need
+   * retry-on-expiry (Solana blockhash) drive that themselves, because
+   * rebuilding requires re-signing and the private key must not outlive
+   * the caller's own scope.
+   */
   sendTransaction(signedTx: SignedTransaction): Promise<string>;
 
   // ─── Explorer / history ────────────────────────────────────────────
@@ -96,8 +130,40 @@ export interface ChainAdapter {
   // ─── Fees ──────────────────────────────────────────────────────────
 
   /** Estimate fees for a transaction */
-  estimateFees(params: RawTransaction): Promise<FeeEstimate>;
+  estimateFees(intent: TxIntent, opts: BuildOpts): Promise<FeeEstimate>;
 
   /** Convert a human-readable amount to raw smallest unit string */
   parseAmount(amount: string): string;
+
+  /** Convert a human-readable token amount to raw units using the token's decimals */
+  parseTokenAmount(amount: string, decimals: number): string;
+
+  /** Convert raw token units to a human-readable string */
+  formatTokenAmount(raw: string, decimals: number): string;
+
+  // ─── Contracts ─────────────────────────────────────────────────────
+
+  /**
+   * Read-only contract call (`eth_call` / `simulateTransaction`).
+   * Returns the raw return data. Needed for swap quotes, slippage
+   * calculation and pre-flight failure detection.
+   */
+  readContract(req: { to: string; data: string }): Promise<string>;
+
+  /**
+   * ERC20 allowance. Chains without an approval concept return the max
+   * uint256 so callers can treat "no approval needed" uniformly.
+   */
+  getAllowance(owner: string, token: string, spender: string): Promise<string>;
+
+  // ─── Metadata ──────────────────────────────────────────────────────
+
+  /** Read token metadata from the contract / mint */
+  getTokenInfo(token: string): Promise<TokenInfo>;
+
+  /**
+   * Current chain height. Used to detect blockhash expiry on Solana;
+   * harmless and useful elsewhere.
+   */
+  getBlockHeight(): Promise<number>;
 }

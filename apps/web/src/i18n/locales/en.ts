@@ -89,7 +89,7 @@ export default {
     sentToken: 'Sent {{symbol}}',
     receivedToken: 'Received {{symbol}}',
     pending: 'pending',
-    footer: 'OpenWallet · Apache-2.0 · v0.1.0',
+    footer: '7xCircle Wallet · Apache-2.0 · v0.1.0',
   },
 
   // ── Receive ──
@@ -152,6 +152,12 @@ export default {
     max: 'Max',
     networkFee: 'Network Fee',
     estimatingFee: 'Estimating fee...',
+    feeTierLabel: 'Transaction speed',
+    feeTier: {
+      slow: 'Slow',
+      normal: 'Normal',
+      fast: 'Fast',
+    },
     preparing: 'Preparing transaction...',
     signing: 'Signing with your private key...',
     broadcasting: 'Broadcasting to network...',

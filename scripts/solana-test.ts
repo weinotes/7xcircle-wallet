@@ -119,13 +119,28 @@ async function main() {
 
   // ── Step 1: build ──────────────────────────────────────────────
   console.log('\n[1/5] Building transaction...');
-  const value = Math.floor(0.001 * LAMPORTS_PER_SOL).toString(); // 0.001 SOL lamports
-  const rawTx = await adapter.buildTransaction({ from, to: from, value } as never);
+  const feeTier = (process.env.FEE_TIER as 'slow' | 'normal' | 'fast') ?? 'normal';
+  const intent = {
+    kind: 'native-transfer' as const,
+    to: from,                                                  // self-send
+    amountRaw: Math.floor(0.001 * LAMPORTS_PER_SOL).toString(),
+  };
+
+  // Estimated fee first — this is the cheap, no-simulation path the UI uses
+  const estimate = await adapter.estimateFees(intent, { from, feeTier });
+  console.log(`   Estimated fee: ${estimate.totalFee} lamports (tier: ${estimate.level})`);
+  console.log(`   Priority price: ${estimate.gasPrice} micro-lamports/CU`);
+
+  const rawTx = await adapter.buildTransaction(intent, { from, feeTier });
+  if (rawTx.chainType !== 'solana') throw new Error('Expected a Solana transaction');
   console.log('   chainId:', rawTx.chainId);
+  console.log('   versioned:', rawTx.versioned);
+  console.log('   blockhash:', rawTx.recentBlockhash);
+  console.log('   valid until block height:', rawTx.lastValidBlockHeight);
 
   // ── Step 2: sign ───────────────────────────────────────────────
   console.log('\n[2/5] Signing with ed25519 keypair (SLIP-0010)...');
-  const signed = await adapter.signTransaction(rawTx as never, pk);
+  const signed = await adapter.signTransaction(rawTx, pk);
   console.log('   ✅  Signature:', signed.signature.slice(0, 24) + '...');
 
   // ── Step 3: send ───────────────────────────────────────────────
@@ -139,8 +154,11 @@ async function main() {
   let status = '';
   for (let i = 0; i < 30; i++) {
     await sleep(3000);
+    // getSignatureStatus (singular) returns ONE status — the previous
+    // `resp.value?.[0]` indexed it as an array, yielded undefined every
+    // time, and so this loop never actually detected confirmation.
     const resp = await conn.getSignatureStatus(hash, { searchTransactionHistory: true });
-    const s = resp.value?.[0];
+    const s = resp.value;
     if (s && (s.confirmationStatus === 'confirmed' || s.confirmationStatus === 'finalized')) {
       status = s.confirmationStatus;
       break;

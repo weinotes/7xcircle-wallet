@@ -21,9 +21,6 @@
 /** Supported chain types */
 export type ChainType = 'evm' | 'solana' | 'utxo' | 'cosmos';
 
-/** Fee estimation level */
-export type FeeLevel = 'low' | 'medium' | 'high';
-
 /** Password strength result */
 export interface PasswordStrength {
   score: 0 | 1 | 2 | 3 | 4;
@@ -61,12 +58,19 @@ export interface TokenBalance extends Token {
   balanceUsd?: number;
 }
 
-/** Raw transaction before signing */
+/**
+ * EVM-shaped unsigned transaction.
+ *
+ * This is the EVM branch of {@link UnsignedTx}. Non-EVM chains carry their
+ * own payload shape and must NOT overload `to`/`value`/`data` to mean
+ * something else (an earlier revision smuggled Solana SPL transfers through
+ * `data` as a string DSL, which broke the meaning of every field here).
+ */
 export interface RawTransaction {
   from: string;
   to: string;
-  value: string;            // wei/lamports as string
-  data?: string;
+  value: string;            // wei as string
+  data?: string;            // calldata hex (EVM only)
   gasLimit?: string;
   gasPrice?: string;        // legacy
   maxFeePerGas?: string;    // EIP-1559
@@ -75,15 +79,75 @@ export interface RawTransaction {
   chainId?: string;
 }
 
+/** Fee speed tier — each chain maps this to its own acceleration strategy */
+export type FeeTier = 'slow' | 'normal' | 'fast';
+
+/**
+ * What the user wants to do — a chain-agnostic semantic layer.
+ *
+ * `amountRaw` is always the smallest-unit value as a string (wei, lamports,
+ * token base units) to avoid floating point precision loss. Adapters are
+ * responsible for translating an intent into their chain's native form.
+ *
+ * Intents describe *what*; the sender is passed separately via BuildOpts.
+ */
+export type TxIntent =
+  | { kind: 'native-transfer'; to: string; amountRaw: string }
+  | {
+      kind: 'token-transfer';
+      token: string;          // ERC20 contract address / SPL mint
+      decimals: number;       // required by SPL transferChecked
+      to: string;
+      amountRaw: string;
+    }
+  | { kind: 'contract-call'; to: string; data: string; valueRaw?: string }
+  // EVM/Tron only — Solana has no approval concept
+  | { kind: 'approve'; token: string; spender: string; amountRaw: string };
+
+/**
+ * A transaction built outside the wallet — returned by an aggregator or dApp
+ * (Jupiter, 0x, WalletConnect). We import and sign it rather than build it.
+ */
+export interface ExternalTx {
+  encoding: 'base64' | 'hex';
+  payload: string;
+  /** Solana: payload is a v0 VersionedTransaction */
+  versioned?: boolean;
+}
+
+/**
+ * Compiled, unsigned transaction ready to sign.
+ * The payload is chain-native and opaque to callers.
+ */
+export type UnsignedTx =
+  | ({ chainType: 'evm'; chainId: string } & RawTransaction)
+  | {
+      chainType: 'solana';
+      chainId: string;
+      /** Hex-serialized unsigned transaction (see shared `toHex` / `fromHex`) */
+      serialized: string;
+      versioned: boolean;
+      recentBlockhash: string;
+      /** Lets callers detect blockhash expiry and rebuild */
+      lastValidBlockHeight: number;
+    };
+
 /** Signed transaction ready for broadcast */
 export interface SignedTransaction {
   raw: unknown;             // chain-specific serialized tx
   signature: string;
 }
 
+/** On-chain token metadata resolved from the contract / mint */
+export interface TokenInfo {
+  symbol: string;
+  name: string;
+  decimals: number;
+}
+
 /** Fee estimate result */
 export interface FeeEstimate {
-  level: FeeLevel;
+  level: FeeTier;
   gasLimit: string;         // estimated gas units
   gasPrice: string;         // per-unit price in native token (wei/lamports)
   totalFee: string;         // total fee = gasLimit * gasPrice

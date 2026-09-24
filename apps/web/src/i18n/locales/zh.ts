@@ -89,7 +89,7 @@ export default {
     sentToken: '发送 {{symbol}}',
     receivedToken: '接收 {{symbol}}',
     pending: '处理中',
-    footer: 'OpenWallet · Apache-2.0 · v0.1.0',
+    footer: '7xCircle Wallet · Apache-2.0 · v0.1.0',
   },
 
   // ── 收款 ──
@@ -152,6 +152,12 @@ export default {
     max: '最大',
     networkFee: '网络费用',
     estimatingFee: '估算费用中...',
+    feeTierLabel: '交易速度',
+    feeTier: {
+      slow: '慢速',
+      normal: '标准',
+      fast: '快速',
+    },
     preparing: '正在准备交易...',
     signing: '正在用您的私钥签名...',
     broadcasting: '正在广播到网络...',

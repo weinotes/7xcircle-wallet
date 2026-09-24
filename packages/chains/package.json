@@ -9,25 +9,32 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "clean": "rm -rf dist"
   },
   "tsup": {
-    "entry": ["src/index.ts"],
-    "format": ["esm"],
+    "entry": [
+      "src/index.ts"
+    ],
+    "format": [
+      "esm"
+    ],
     "dts": true,
     "clean": true
   },
   "dependencies": {
-    "@open-wallet/shared": "workspace:*",
-    "@open-wallet/core": "workspace:*",
     "@noble/hashes": "^1.6.0",
+    "@open-wallet/core": "workspace:*",
+    "@open-wallet/shared": "workspace:*",
+    "@solana/spl-token": "^0.4.15",
+    "@solana/web3.js": "^1.98.4",
     "bs58": "^5.0.0",
     "tweetnacl": "^1.0.3",
-    "viem": "^2.21.0",
-    "@solana/web3.js": "^1.98.4"
+    "viem": "^2.21.0"
   },
   "devDependencies": {
     "tsup": "^8.3.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
   }
 }

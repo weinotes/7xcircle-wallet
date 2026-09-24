@@ -2,6 +2,13 @@ packages:
   - 'apps/*'
   - 'packages/*'
 allowBuilds:
+  # bigint-buffer ships an OPTIONAL native addon compiled with node-gyp.
+  # Disabled: the pure-JS fallback is what already runs (spl-token prints
+  # "bigint: Failed to load bindings, pure JS will be used"), and compiling
+  # it would require a C++ toolchain on every contributor machine and in CI.
+  # Leaving an unresolved value here made pnpm's dependency status check fail
+  # for every `pnpm run` / `pnpm exec`, which broke build, test and typecheck.
+  bigint-buffer: false
   bufferutil: true
   esbuild: true
   utf-8-validate: true

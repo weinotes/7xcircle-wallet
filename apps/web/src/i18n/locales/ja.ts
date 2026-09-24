@@ -89,7 +89,7 @@ export default {
     sentToken: '{{symbol}} を送金',
     receivedToken: '{{symbol}} を受け取り',
     pending: '処理中',
-    footer: 'OpenWallet · Apache-2.0 · v0.1.0',
+    footer: '7xCircle Wallet · Apache-2.0 · v0.1.0',
   },
 
   // ── 受け取り ──
@@ -152,6 +152,12 @@ export default {
     max: '最大',
     networkFee: 'ネットワーク手数料',
     estimatingFee: '手数料を計算中...',
+    feeTierLabel: '取引速度',
+    feeTier: {
+      slow: '低速',
+      normal: '標準',
+      fast: '高速',
+    },
     preparing: '取引を準備中...',
     signing: '秘密鍵で署名中...',
     broadcasting: 'ネットワークに送信中...',

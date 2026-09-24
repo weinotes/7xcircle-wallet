@@ -41,7 +41,7 @@ import {
   formatUnits,
   getContract,
   erc20Abi,
-  encodeFunctionData,
+  parseTransaction,
 } from 'viem';
 import { privateKeyToAccount, publicKeyToAddress } from 'viem/accounts';
 import {
@@ -57,15 +57,33 @@ import {
 
 import type {
   ChainConfig,
+  ExternalTx,
   FeeEstimate,
-  RawTransaction,
+  FeeTier,
   SignedTransaction,
   TokenBalance,
+  TokenInfo,
   TransactionRecord,
+  TxIntent,
+  UnsignedTx,
 } from '@open-wallet/shared';
-import type { ChainAdapter } from '@open-wallet/core';
+import type { BuildOpts, ChainAdapter } from '@open-wallet/core';
 import { toEip55Address, validateEip55Address } from './utils.js';
 import { ExplorerClient, type ExplorerNativeTx, type ExplorerTokenTx } from './explorer.js';
+import { compileIntent, decodeUint256, encodeAllowance } from './intent.js';
+
+/**
+ * Fee-tier multipliers applied to the priority fee, in basis points.
+ *
+ * On EIP-1559 chains `maxFeePerGas` is only a ceiling — the actual payment
+ * is `min(maxFee, baseFee + priorityFee)`. So only the priority fee
+ * genuinely costs more; raising the ceiling just absorbs base-fee spikes.
+ */
+const FEE_TIER_BPS: Record<FeeTier, bigint> = {
+  slow: 9_000n,
+  normal: 10_000n,
+  fast: 13_000n,
+};
 
 /** Global explorer API key — read from env at module load. Optional. */
 const EXPLORER_API_KEY =
@@ -91,6 +109,8 @@ export class EvmAdapter implements ChainAdapter {
 
   private publicClient: PublicClient;
   private chain: ViemChain;
+  /** Effective RPC list (override applied) — reused for the signing transport */
+  private rpcs: string[];
   /** Cached EIP-1559 support detection — undefined = not yet probed */
   private supports1559: boolean | undefined;
   /** Lazy explorer client — only built when history is requested */
@@ -126,7 +146,9 @@ export class EvmAdapter implements ChainAdapter {
     // node is slow or unreachable; `rank: false` skips the upfront
     // parallel probe of every node (that produced many ERR_ABORTED
     // console errors in no-network environments).
-    const transports = config.rpcs.map(url =>
+    this.rpcs = config.rpcs;
+
+    const transports = this.rpcs.map(url =>
       http(url, { timeout: 8_000, retryCount: 1, retryDelay: 200 }),
     );
 
@@ -289,35 +311,42 @@ export class EvmAdapter implements ChainAdapter {
 
   // ─── Transactions ──────────────────────────────────────────────────
 
-  async buildTransaction(params: RawTransaction): Promise<RawTransaction> {
+  async buildTransaction(intent: TxIntent, opts: BuildOpts): Promise<UnsignedTx> {
+    const call = compileIntent(intent);
+    const from = opts.from;
+
     // Fill nonce from RPC
     const nonce = await this.publicClient.getTransactionCount({
-      address: params.from as Address,
+      address: from as Address,
     });
 
     // Estimate gas for the actual operation (not hard-coded 21000)
     const gasEstimate = await this.publicClient.estimateGas({
-      account: params.from as Address,
-      to: params.to as Address,
-      value: params.value ? BigInt(params.value) : undefined,
-      data: params.data as Hex | undefined,
+      account: from as Address,
+      to: call.to as Address,
+      value: call.value ? BigInt(call.value) : undefined,
+      data: call.data as Hex | undefined,
     });
 
     const supports1559 = await this.detectEip1559();
-    const fees = await this.estimateFees(params, gasEstimate);
+    const fees = await this.estimateFees(intent, opts, gasEstimate);
 
-    const built: RawTransaction = {
-      ...params,
+    const built: UnsignedTx = {
+      chainType: 'evm',
+      chainId: this.config.chainId,
+      from,
+      to: call.to,
+      value: call.value,
+      data: call.data,
       nonce,
       gasLimit: gasEstimate.toString(),
-      chainId: this.config.chainId,
     };
 
     if (supports1559) {
-      // EIP-1559 path
+      // EIP-1559 path. `estimateFees` already applied the fee tier, so
+      // deriving the tip from the ceiling keeps the multiplier intact.
       built.maxFeePerGas = fees.gasPrice;
-      const priorityFee = (BigInt(fees.gasPrice) / 10n).toString();
-      built.maxPriorityFeePerGas = priorityFee;
+      built.maxPriorityFeePerGas = (BigInt(fees.gasPrice) / 10n).toString();
     } else {
       // Legacy path — use gasPrice only
       built.gasPrice = fees.gasPrice;
@@ -326,16 +355,52 @@ export class EvmAdapter implements ChainAdapter {
     return built;
   }
 
+  /**
+   * Import an externally-built EVM transaction (an aggregator quote such as
+   * 0x, or a dApp request). The payload is a fully-populated serialized
+   * transaction, so we decode it rather than rebuild.
+   */
+  async importExternalTransaction(tx: ExternalTx, opts: BuildOpts): Promise<UnsignedTx> {
+    if (tx.encoding !== 'hex') {
+      throw new Error(`EVM transactions must be hex-encoded, got ${tx.encoding}`);
+    }
+
+    const parsed = parseTransaction(tx.payload as Hex);
+
+    if (!parsed.to) {
+      // The wallet UI has no way to surface a contract deployment safely.
+      throw new Error('Contract creation transactions are not supported');
+    }
+
+    return {
+      chainType: 'evm',
+      chainId: this.config.chainId,
+      from: opts.from,
+      to: parsed.to,
+      value: (parsed.value ?? 0n).toString(),
+      data: parsed.data,
+      nonce: parsed.nonce,
+      gasLimit: parsed.gas?.toString(),
+      gasPrice: parsed.gasPrice?.toString(),
+      maxFeePerGas: parsed.maxFeePerGas?.toString(),
+      maxPriorityFeePerGas: parsed.maxPriorityFeePerGas?.toString(),
+    };
+  }
+
   async signTransaction(
-    rawTx: RawTransaction,
+    tx: UnsignedTx,
     privateKey: Uint8Array,
   ): Promise<SignedTransaction> {
+    if (tx.chainType !== 'evm') {
+      throw new Error(`EvmAdapter cannot sign a ${tx.chainType} transaction`);
+    }
+
     const pkHex = '0x' + Array.from(privateKey)
       .map(b => b.toString(16).padStart(2, '0')).join('') as Hex;
 
     const account = privateKeyToAccount(pkHex);
     // Reuse the same fallback transport pattern as publicClient
-    const transports = this.config.rpcs.map(url =>
+    const transports = this.rpcs.map(url =>
       http(url, { timeout: 8_000, retryCount: 1, retryDelay: 200 }),
     );
     const walletClient = createWalletClient({
@@ -349,21 +414,21 @@ export class EvmAdapter implements ChainAdapter {
     // Build gas fields — NEVER mix 1559 fields with legacy gasPrice
     const gasFields = supports1559
       ? {
-          maxFeePerGas: rawTx.maxFeePerGas ? BigInt(rawTx.maxFeePerGas) : undefined,
-          maxPriorityFeePerGas: rawTx.maxPriorityFeePerGas
-            ? BigInt(rawTx.maxPriorityFeePerGas)
+          maxFeePerGas: tx.maxFeePerGas ? BigInt(tx.maxFeePerGas) : undefined,
+          maxPriorityFeePerGas: tx.maxPriorityFeePerGas
+            ? BigInt(tx.maxPriorityFeePerGas)
             : undefined,
         }
       : {
-          gasPrice: rawTx.gasPrice ? BigInt(rawTx.gasPrice) : undefined,
+          gasPrice: tx.gasPrice ? BigInt(tx.gasPrice) : undefined,
         };
 
     const signature = await walletClient.signTransaction({
-      to: rawTx.to as Address,
-      value: rawTx.value ? BigInt(rawTx.value) : undefined,
-      data: rawTx.data as Hex | undefined,
-      nonce: rawTx.nonce,
-      gas: rawTx.gasLimit ? BigInt(rawTx.gasLimit) : undefined,
+      to: tx.to as Address,
+      value: tx.value ? BigInt(tx.value) : undefined,
+      data: tx.data as Hex | undefined,
+      nonce: tx.nonce,
+      gas: tx.gasLimit ? BigInt(tx.gasLimit) : undefined,
       chainId: this.chainDecimalId,
       ...gasFields,
     });
@@ -455,9 +520,12 @@ export class EvmAdapter implements ChainAdapter {
    * display in the Send page must agree with what buildTransaction produces.
    */
   async estimateFees(
-    params: RawTransaction,
+    intent: TxIntent,
+    opts: BuildOpts,
     preEstimatedGas?: bigint,
   ): Promise<FeeEstimate> {
+    const call = compileIntent(intent);
+    const feeTier = opts.feeTier ?? 'normal';
     const supports1559 = await this.detectEip1559();
 
     let gasLimit: bigint;
@@ -467,10 +535,10 @@ export class EvmAdapter implements ChainAdapter {
       try {
         // Auto-estimate real gas needed for this specific tx
         gasLimit = await this.publicClient.estimateGas({
-          account: params.from as Address,
-          to: params.to as Address,
-          value: params.value ? BigInt(params.value) : undefined,
-          data: params.data as Hex | undefined,
+          account: opts.from as Address,
+          to: call.to as Address,
+          value: call.value ? BigInt(call.value) : undefined,
+          data: call.data as Hex | undefined,
         });
       } catch {
         // estimateGas can fail on invalid params (e.g. bad to address).
@@ -495,12 +563,40 @@ export class EvmAdapter implements ChainAdapter {
       gasPrice = await this.publicClient.getGasPrice();
     }
 
+    // Apply the requested speed tier
+    gasPrice = (gasPrice * FEE_TIER_BPS[feeTier]) / 10_000n;
+
     return {
-      level: 'medium',
+      level: feeTier,
       gasLimit: gasLimit.toString(),
       gasPrice: gasPrice.toString(),
       totalFee: (gasPrice * gasLimit).toString(),
     };
+  }
+
+  // ─── Contracts ─────────────────────────────────────────────────────
+
+  /** Read-only call. Returns raw return data hex (e.g. '0x' for a non-contract). */
+  async readContract(req: { to: string; data: string }): Promise<string> {
+    const result = await this.publicClient.call({
+      to: req.to as Address,
+      data: req.data as Hex,
+    });
+    return result.data ?? '0x';
+  }
+
+  /** Current allowance the spender holds over the owner's tokens */
+  async getAllowance(owner: string, token: string, spender: string): Promise<string> {
+    const data = await this.readContract({
+      to: token,
+      data: encodeAllowance(owner, spender),
+    });
+    return decodeUint256(data).toString();
+  }
+
+  /** Current block number */
+  async getBlockHeight(): Promise<number> {
+    return Number(await this.publicClient.getBlockNumber());
   }
 
   /** Convert a human-readable amount to raw wei */
@@ -536,23 +632,6 @@ export class EvmAdapter implements ChainAdapter {
       decimals: Number(decimals),
       name: String(name),
     };
-  }
-
-  /**
-   * Encode an ERC20 transfer(address,uint256) call as calldata hex.
-   * The caller should then pass this as `RawTransaction.data` with
-   * `to` set to the token contract address and `value` set to "0".
-   */
-  encodeErc20Transfer(
-    tokenAddress: string,
-    recipient: string,
-    amountRaw: string,
-  ): Hex {
-    return encodeFunctionData({
-      abi: erc20Abi,
-      functionName: 'transfer',
-      args: [recipient as Address, BigInt(amountRaw)],
-    }) as Hex;
   }
 
   /** Convert a human-readable token amount to raw units using the token's decimals */

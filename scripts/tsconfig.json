@@ -1,0 +1,25 @@
+{
+  // Integration scripts are the only end-to-end verification this repo has,
+  // and they were previously not typechecked at all — which is how `as never`
+  // / `as any` casts survived unnoticed through an interface change.
+  //
+  // `paths` maps the workspace packages and the root-hoisted deps that pnpm
+  // does not link into the root node_modules (tsx resolves them at runtime
+  // via .pnpm/node_modules, but tsc does not).
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "baseUrl": "..",
+    "paths": {
+      "@open-wallet/shared": ["packages/shared/src/index.ts"],
+      "@open-wallet/core": ["packages/core/src/index.ts"],
+      "@open-wallet/chains": ["packages/chains/src/index.ts"],
+      "viem": ["packages/chains/node_modules/viem"],
+      "viem/accounts": ["packages/chains/node_modules/viem/accounts"],
+      "@solana/web3.js": ["packages/chains/node_modules/@solana/web3.js"],
+      "@solana/spl-token": ["packages/chains/node_modules/@solana/spl-token"],
+      "bs58": ["packages/chains/node_modules/bs58"]
+    }
+  },
+  "include": ["**/*.ts"]
+}

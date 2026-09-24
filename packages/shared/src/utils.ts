@@ -90,3 +90,57 @@ export function fromHex(hex: string): Uint8Array {
 export function wipeBytes(buf: Uint8Array): void {
   for (let i = 0; i < buf.length; i++) buf[i] = 0;
 }
+
+// ─── Base64 ──────────────────────────────────────────────────────────
+//
+// Implemented here rather than via `Buffer` (Node-only) or `btoa`/`atob`
+// (not reliably present on React Native), so the wallet code runs unchanged
+// on web, extension and mobile.
+
+const B64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+/** Encode bytes to standard base64 (with padding) */
+export function bytesToBase64(bytes: Uint8Array): string {
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const b0 = bytes[i];
+    const b1 = bytes[i + 1];
+    const b2 = bytes[i + 2];
+
+    out += B64_ALPHABET[b0 >> 2];
+    out += B64_ALPHABET[((b0 & 0x03) << 4) | ((b1 ?? 0) >> 4)];
+
+    if (b1 === undefined) {
+      out += '==';
+    } else if (b2 === undefined) {
+      out += B64_ALPHABET[(b1 & 0x0f) << 2];
+      out += '=';
+    } else {
+      out += B64_ALPHABET[((b1 & 0x0f) << 2) | (b2 >> 6)];
+      out += B64_ALPHABET[b2 & 0x3f];
+    }
+  }
+  return out;
+}
+
+/** Decode standard base64 into bytes. Tolerates whitespace and missing padding. */
+export function base64ToBytes(b64: string): Uint8Array {
+  // Strip padding and any non-alphabet characters (newlines from wrapped JSON)
+  const clean = b64.replace(/[^A-Za-z0-9+/]/g, '');
+  const outLength = Math.floor((clean.length * 3) / 4);
+  const out = new Uint8Array(outLength);
+
+  let p = 0;
+  for (let i = 0; i < clean.length; i += 4) {
+    const c0 = B64_ALPHABET.indexOf(clean[i]);
+    const c1 = B64_ALPHABET.indexOf(clean[i + 1] ?? 'A');
+    const c2 = B64_ALPHABET.indexOf(clean[i + 2] ?? 'A');
+    const c3 = B64_ALPHABET.indexOf(clean[i + 3] ?? 'A');
+
+    if (p < outLength) out[p++] = (c0 << 2) | (c1 >> 4);
+    if (p < outLength) out[p++] = ((c1 & 0x0f) << 4) | (c2 >> 2);
+    if (p < outLength) out[p++] = ((c2 & 0x03) << 6) | c3;
+  }
+
+  return out;
+}

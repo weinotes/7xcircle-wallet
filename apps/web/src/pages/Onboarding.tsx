@@ -179,7 +179,7 @@ export function Onboarding() {
   if (step === 'choice') {
     return (
       <div style={cardStyle}>
-        <div style={titleStyle}>OpenWallet</div>
+        <div style={titleStyle}>7xCircle Wallet</div>
         <div style={{ textAlign: 'center', color: 'var(--ow-text-secondary)' }}>
           {t('onboarding.slogan')}
         </div>

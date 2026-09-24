@@ -22,10 +22,10 @@
  *                   via the real EvmAdapter (build → sign → broadcast → poll).
  *
  * Optional env:
- *   GAS_PRICE_MULTIPLIER   Multiply the estimated gas price (default 1).
- *                          BSC testnet validators IGNORE floor-price txs
- *                          (~0.1 gwei, what the RPC suggests) — they sit in
- *                          the mempool forever. Use 20 (~2 gwei) for testnet.
+ *   FEE_TIER   slow | normal | fast (default: fast).
+ *              BSC testnet validators IGNORE floor-price txs (~0.1 gwei,
+ *              what the RPC suggests) — they sit in the mempool forever.
+ *              The fast tier raises the priority fee enough to get mined.
  *
  * Usage:
  *   # Step 1 — generate a test address
@@ -35,7 +35,7 @@
  *   #           claim ~0.1 tBNB, wait ~1 min.
  *
  *   # Step 3 — run the send test
- *   PRIVATE_KEY=0xabc... GAS_PRICE_MULTIPLIER=20 pnpm tsx scripts/evm-test.ts
+ *   PRIVATE_KEY=0xabc... pnpm tsx scripts/evm-test.ts
  */
 
 import { randomBytes } from 'node:crypto';
@@ -139,14 +139,23 @@ async function runSendMode() {
   // ── Step 1: Estimate fees ───────────────────────────────────────
   console.log('\n[1/5] Estimating fees...');
   const toAmount = BigInt(100_000_000_000_000); // 0.0001 tBNB in wei
-  const fees = await adapter.estimateFees({
-    from,
+
+  // BSC testnet validators ignore floor-price txs and the tx sits in the
+  // mempool forever, so default to the fast tier here. This replaces the
+  // old GAS_PRICE_MULTIPLIER post-hoc mutation of maxFeePerGas.
+  const feeTier = (process.env.FEE_TIER as 'slow' | 'normal' | 'fast') ?? 'fast';
+  const intent = {
+    kind: 'native-transfer' as const,
     to: from, // self-transfer for simplicity
-    value: toAmount.toString(),
-  });
+    amountRaw: toAmount.toString(),
+  };
+  const buildOpts = { from, feeTier };
+
+  const fees = await adapter.estimateFees(intent, buildOpts);
   const gasPrice = BigInt(fees.gasPrice);
   const gasLimit = BigInt(fees.gasLimit);
   const feeTotal = gasPrice * gasLimit;
+  console.log('   tier     :', fees.level);
   console.log('   gasPrice :', gasPrice.toString(), 'wei');
   console.log('   gasLimit :', gasLimit.toString());
   console.log('   totalFee :', feeTotal.toString(), 'wei (', (Number(feeTotal) / 1e18).toFixed(8), 'tBNB )');
@@ -159,32 +168,12 @@ async function runSendMode() {
 
   // ── Step 2: Build transaction ────────────────────────────────────
   console.log('\n[2/5] Building transaction (fill nonce, estimate gas)...');
-  const rawTx = await adapter.buildTransaction({
-    from,
-    to: from, // self-transfer
-    value: toAmount.toString(),
-  });
+  const rawTx = await adapter.buildTransaction(intent, buildOpts);
+  if (rawTx.chainType !== 'evm') throw new Error('Expected an EVM transaction');
   console.log('   nonce        :', rawTx.nonce);
   console.log('   gasLimit     :', rawTx.gasLimit);
   console.log('   maxFeePerGas :', rawTx.maxFeePerGas);
   console.log('   chainId      :', rawTx.chainId);
-
-  // ── Step 2.5: Optional gas price multiplier ──────────────────────
-  // BSC testnet validators ignore floor-price txs; bump the fee so the
-  // broadcast tx actually gets mined (see header docs).
-  const multiplier = Number(process.env.GAS_PRICE_MULTIPLIER || '1');
-  if (multiplier > 1) {
-    if (rawTx.maxFeePerGas) {
-      rawTx.maxFeePerGas = (BigInt(rawTx.maxFeePerGas) * BigInt(Math.round(multiplier * 100)) / 100n).toString();
-      if (rawTx.maxPriorityFeePerGas) {
-        rawTx.maxPriorityFeePerGas = (BigInt(rawTx.maxPriorityFeePerGas) * BigInt(Math.round(multiplier * 100)) / 100n).toString();
-      }
-    }
-    if (rawTx.gasPrice) {
-      rawTx.gasPrice = (BigInt(rawTx.gasPrice) * BigInt(Math.round(multiplier * 100)) / 100n).toString();
-    }
-    console.log(`   (gas price × ${multiplier} → maxFeePerGas: ${rawTx.maxFeePerGas ?? rawTx.gasPrice})`);
-  }
 
   // ── Step 3: Sign ──────────────────────────────────────────────────
   console.log('\n[3/5] Signing with transient private key...');

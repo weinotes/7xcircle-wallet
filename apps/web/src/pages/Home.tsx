@@ -169,7 +169,7 @@ export function Home() {
     <div style={contentStyle}>
       <div style={headerStyle}>
         <div style={{ fontSize: 'var(--ow-font-size-lg)', fontWeight: 700 }}>
-          OpenWallet
+          7xCircle Wallet
         </div>
         <div style={{ display: 'flex', gap: 'var(--ow-space-2)', alignItems: 'center' }}>
           {chainSelector}
@@ -406,7 +406,7 @@ export function Home() {
       </div>
 
       <div style={{ marginTop: 'auto', textAlign: 'center', fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-text-tertiary)' }}>
-        OpenWallet · Apache-2.0 · v0.1.0
+        7xCircle Wallet · Apache-2.0 · v0.1.0
       </div>
     </div>
   );

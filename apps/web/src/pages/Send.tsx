@@ -14,26 +14,24 @@
  * limitations under the License.
  */
 /**
- * Send page — supports native + ERC20/BEP20 token transfers on EVM chains.
+ * Send page — native and token transfers, chain-agnostic.
  *
  * Lifecycle:
- *   1. Choose token mode: Native (gas token) or ERC20 (by contract address)
+ *   1. Choose token mode: Native (gas token) or ERC20/SPL (by address)
  *   2. Enter recipient + amount → real-time validation
- *   3. Fee auto-estimated (handles ERC20 calldata gas correctly)
- *   4. Review → Build → Sign → Broadcast → Poll confirm
+ *   3. Fee auto-estimated for the matching intent
+ *   4. Review → Build → Sign → Broadcast → Confirm
  *
- * ERC20 flow detail:
- *   - User enters token contract address → we read symbol/decimals/name on-chain
- *   - Transfer calldata is built via adapter.encodeErc20Transfer()
- *   - RawTransaction: to = token contract, value = "0", data = transfer calldata
- *   - Everything else (gas estimate, sign, broadcast, explorer history)
- *     works unchanged — the EVM adapter already handles data fields.
+ * Chain differences live entirely in the adapter. This page builds one
+ * `TxIntent` — a native-transfer or a token-transfer — and hands it to
+ * `useTxFlow`. ERC20 and SPL take the same code path; the adapter compiles
+ * the intent into calldata or into Solana instructions respectively.
  *
  * Security:
- *   - Private key derived ONLY at signing time, wiped immediately after
- *   - Address validated via EIP-55 checksum before signing
+ *   - Private key derived ONLY at signing time, wiped in a `finally`
+ *   - Address validated before signing
  *   - Amount ≤ available balance enforced before broadcast
- *   - On the ERC20 path we always call .transfer() (no infinite approval flow)
+ *   - Token sends always call `.transfer()` (no infinite approval flow)
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -41,13 +39,16 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ArrowRight, Loader2, CheckCircle2, XCircle, Coins, Wallet, ChevronDown, ListPlus } from 'lucide-react';
 import { Button, Input, Modal } from '@open-wallet/ui';
-import { chainRegistry, getPrivateKey, isUnlocked, touchActivity } from '@open-wallet/core';
+import { chainRegistry } from '@open-wallet/core';
 import { useWalletStore } from '../store/wallet.js';
 import { CHAIN_CONFIGS } from '@open-wallet/chains';
 import { formatBalance } from '@open-wallet/shared';
-import type { TransactionRecord, TokenBalance } from '@open-wallet/shared';
+import type { FeeTier, TokenBalance, TxIntent } from '@open-wallet/shared';
+import { useTxFlow } from '../hooks/useTxFlow.js';
 
 type TxStatus = 'idle' | 'estimating' | 'ready' | 'building' | 'signing' | 'broadcasting' | 'pending' | 'confirmed' | 'failed';
+/** Statuses owned by local fee estimation (the hook owns the rest) */
+type EstimateStatus = 'idle' | 'estimating' | 'ready';
 type TokenMode = 'native' | 'erc20';
 
 interface Erc20Info {
@@ -64,9 +65,9 @@ export function Send() {
   const [toAddress, setToAddress] = useState('');
   const [amount, setAmount] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
-  const [status, setStatus] = useState<TxStatus>('idle');
-  const [txHash, setTxHash] = useState<string | null>(null);
-  const [txError, setTxError] = useState<string | null>(null);
+  /** Fee-estimation phase only — the transaction phase lives in useTxFlow */
+  const [estimateStatus, setEstimateStatus] = useState<EstimateStatus>('idle');
+  const [feeTier, setFeeTier] = useState<FeeTier>('normal');
 
   // ERC20-specific state
   const [erc20Address, setErc20Address] = useState('');
@@ -95,12 +96,21 @@ export function Send() {
 
   const activeChainId = useWalletStore(s => s.activeChainId);
   const accounts = useWalletStore(s => s.accounts);
-  const addPendingTx = useWalletStore(s => s.addPendingTx);
-  const removePendingTx = useWalletStore(s => s.removePendingTx);
   const fromAccount = accounts.find(a => a.chainId === activeChainId);
 
   const adapter = chainRegistry.get(activeChainId);
   const activeChain = CHAIN_CONFIGS.find(c => c.chainId === activeChainId);
+
+  // Build → sign → broadcast → confirm, including Solana blockhash retry
+  const flow = useTxFlow({ adapter, account: fromAccount, chainId: activeChainId, feeTier });
+
+  /**
+   * A single status for the UI to render. The transaction phase wins once it
+   * starts; before that we show the fee-estimation phase.
+   */
+  const status: TxStatus = flow.status !== 'idle' ? flow.status : estimateStatus;
+  const txHash = flow.txHash;
+  const txError = flow.error;
 
   // ── Resolve which token we're sending ──────────────────────────────
   const sendToken = useMemo(() => {
@@ -208,9 +218,7 @@ export function Send() {
     // Debounce: wait 400ms before hitting RPC
     const timer = setTimeout(async () => {
       try {
-        const info = await (adapter as unknown as {
-          getTokenInfo: (addr: string) => Promise<Erc20Info>;
-        }).getTokenInfo(erc20Address);
+        const info = await adapter.getTokenInfo(erc20Address);
         if (cancelled) return;
         setTokenInfo({ ...info, address: erc20Address });
       } catch {
@@ -291,9 +299,7 @@ export function Send() {
         if (sendToken.isNative) {
           rawAmount = adapter.parseAmount(amount);
         } else {
-          rawAmount = (adapter as unknown as {
-            parseTokenAmount: (a: string, d: number) => string;
-          }).parseTokenAmount(amount, sendToken.decimals);
+          rawAmount = adapter.parseTokenAmount(amount, sendToken.decimals);
         }
       } catch {
         setValidationError(t('send.invalidAmount'));
@@ -315,30 +321,26 @@ export function Send() {
     }
 
     async function estimateFee() {
-      setStatus(s => s === 'broadcasting' || s === 'pending' ? s : 'estimating');
+      setEstimateStatus('estimating');
       try {
-        // Build a tentative raw tx for fee estimation
-        let estimateParams: { from: string; to: string; value: string; data?: string };
-        if (sendToken.isNative) {
-          estimateParams = {
-            from: fromAccount!.address,
-            to: toAddress,
-            value: rawAmount,
-          };
-        } else {
-          // ERC20: to = contract, value = 0, data = transfer calldata
-          const data = (adapter as unknown as {
-            encodeErc20Transfer: (contract: string, to: string, amount: string) => string;
-          }).encodeErc20Transfer(sendToken.address, toAddress, rawAmount);
-          estimateParams = {
-            from: fromAccount!.address,
-            to: sendToken.address,
-            value: '0',
-            data,
-          };
-        }
+        // A single intent covers native, ERC20 and SPL alike — the adapter
+        // compiles it into whatever the chain needs. (Previously this branch
+        // called `encodeErc20Transfer`, which does not exist on Solana, so
+        // SPL transfers could not estimate a fee at all.)
+        const intent: TxIntent = sendToken.isNative
+          ? { kind: 'native-transfer', to: toAddress, amountRaw: rawAmount }
+          : {
+              kind: 'token-transfer',
+              token: sendToken.address,
+              decimals: sendToken.decimals,
+              to: toAddress,
+              amountRaw: rawAmount,
+            };
 
-        const fees = await adapter!.estimateFees(estimateParams);
+        const fees = await adapter!.estimateFees(intent, {
+          from: fromAccount!.address,
+          feeTier,
+        });
         const formattedFee = formatBalance(fees.totalFee, activeChain!.nativeDecimals, 8);
         setFeeInfo({
           nativeFee: formattedFee,
@@ -346,131 +348,78 @@ export function Send() {
           gasLimit: fees.gasLimit,
           gasPrice: fees.gasPrice,
         });
-        setStatus('ready');
+        setEstimateStatus('ready');
       } catch {
         setValidationError(t('send.couldNotEstimateFee'));
-        setStatus('idle');
+        setEstimateStatus('idle');
       }
     }
-  }, [toAddress, amount, adapter, fromAccount, activeChain, tokenMode, erc20Address, tokenInfo, sendToken, balance, tokenInfoLoading, tokenInfoError]);
+  }, [toAddress, amount, adapter, fromAccount, activeChain, tokenMode, erc20Address, tokenInfo, sendToken, balance, tokenInfoLoading, tokenInfoError, feeTier]);
 
-  // ── Poll transaction confirmation ─────────────────────────────────
+  // Confirmation polling now lives in useTxFlow, which also owns the
+  // Solana blockhash-expiry retry.
+
+  /**
+   * Once the transaction is actually built the adapter knows the exact fee.
+   * Prefer it over the pre-build estimate so the confirm screen shows what
+   * will really be paid.
+   */
   useEffect(() => {
-    if (status !== 'pending' || !txHash || !adapter) return;
-    if (!isUnlocked()) { setTxError(t('send.walletLockedBeforeConfirm')); return; }
-
-    const poll = async () => {
-      try {
-        const result = await adapter!.getTransactionStatus(txHash!);
-        if (result === 'confirmed') {
-          removePendingTx(activeChainId, txHash!);
-          setStatus('confirmed');
-        } else if (result === 'failed') {
-          removePendingTx(activeChainId, txHash!);
-          setStatus('failed');
-          setTxError(t('send.txReverted'));
-        }
-      } catch {
-        // keep polling
-      }
-    };
-
-    poll();
-    const interval = setInterval(poll, 3000);
-    return () => clearInterval(interval);
-  }, [status, txHash, adapter, activeChainId, removePendingTx]);
+    const fee = flow.resolvedFee;
+    if (!fee || !activeChain) return;
+    setFeeInfo({
+      nativeFee: formatBalance(fee.totalFee, activeChain.nativeDecimals, 8),
+      rawFee: fee.totalFee,
+      gasLimit: fee.gasLimit,
+      gasPrice: fee.gasPrice,
+    });
+  }, [flow.resolvedFee, activeChain]);
 
   // ── Main send handler ──────────────────────────────────────────────
   const handleSend = async () => {
     if (!adapter || !fromAccount) {
-      setTxError(t('send.walletNotReady'));
+      setValidationError(t('send.walletNotReady'));
       return;
     }
 
-    // ERC20 preconditions
     if (tokenMode === 'erc20' && !tokenInfo) {
-      setTxError(t('send.tokenNotLoaded'));
+      setValidationError(t('send.tokenNotLoaded'));
       return;
     }
 
     setShowConfirm(false);
-    setTxError(null);
+    setValidationError('');
 
-    const sendAdapter = adapter as unknown as {
-      parseTokenAmount: (a: string, d: number) => string;
-      encodeErc20Transfer: (contract: string, to: string, amount: string) => string;
-    };
+    const rawAmount = sendToken.isNative
+      ? adapter.parseAmount(amount)
+      : adapter.parseTokenAmount(amount, sendToken.decimals);
 
-    // Parse amount in the correct unit
-    let rawAmount: string;
-    if (sendToken.isNative) {
-      rawAmount = adapter.parseAmount(amount);
-    } else {
-      rawAmount = sendAdapter.parseTokenAmount(amount, sendToken.decimals);
-    }
-
-    try {
-      // 1) Build the raw tx (gas + nonce filled by adapter)
-      setStatus('building');
-
-      let buildParams: { from: string; to: string; value: string; data?: string };
-      if (sendToken.isNative) {
-        buildParams = {
-          from: fromAccount.address,
+    // One intent covers native, ERC20 and SPL. There is no chain branch
+    // here — the adapter compiles it into whatever the chain needs.
+    const intent: TxIntent = sendToken.isNative
+      ? { kind: 'native-transfer', to: toAddress, amountRaw: rawAmount }
+      : {
+          kind: 'token-transfer',
+          token: sendToken.address,
+          decimals: sendToken.decimals,
           to: toAddress,
-          value: rawAmount,
+          amountRaw: rawAmount,
         };
-      } else {
-        buildParams = {
-          from: fromAccount.address,
-          to: sendToken.address,          // tx TO = ERC20 contract
-          value: '0',                      // no native value sent
-          data: sendAdapter.encodeErc20Transfer(sendToken.address, toAddress, rawAmount),
-        };
-      }
 
-      const rawTx = await adapter.buildTransaction(buildParams);
-
-      // 2) Sign — transient private key
-      setStatus('signing');
-      touchActivity();
-      const privateKey = getPrivateKey(fromAccount);
-      try {
-        const signed = await adapter.signTransaction(rawTx, privateKey);
-
-        // 3) Broadcast
-        setStatus('broadcasting');
-        const hash = await adapter.sendTransaction(signed);
-        setTxHash(hash);
-
-        // 4) Add local pending entry
-        const localTx: TransactionRecord = {
-          hash,
-          from: fromAccount.address,
-          to: sendToken.isNative ? toAddress : sendToken.address,
-          value: rawAmount,
-          blockNumber: 0,
-          blockTimestamp: Math.floor(Date.now() / 1000),
-          status: 'pending',
-          direction: 'sent',
-          fee: feeInfo?.rawFee,
-          // Fill ERC20 metadata so Home/History display correctly
-          ...(sendToken.isNative ? {} : {
-            tokenSymbol: sendToken.symbol,
-            tokenAddress: sendToken.address,
-            tokenDecimals: sendToken.decimals,
-          }),
-        };
-        addPendingTx(activeChainId, localTx);
-
-        setStatus('pending');
-      } finally {
-        if ('fill' in privateKey) privateKey.fill(0);
-      }
-    } catch (e) {
-      setTxError((e as Error).message);
-      setStatus('failed');
-    }
+    await flow.send(intent, {
+      // The RECIPIENT, not the token contract. Storing the contract here
+      // (as the previous implementation did) hid where funds actually went.
+      displayTo: toAddress,
+      amountRaw: rawAmount,
+      token: sendToken.isNative
+        ? undefined
+        : {
+            symbol: sendToken.symbol,
+            address: sendToken.address,
+            decimals: sendToken.decimals,
+            isNative: false,
+          },
+    });
   };
 
   // ── Max button ──────────────────────────────────────────────────────
@@ -507,7 +456,7 @@ export function Send() {
       <div style={cardStyle}>
         <Modal
           open={true}
-          onClose={() => { setTxHash(null); navigate('/'); }}
+          onClose={() => { flow.reset(); navigate('/'); }}
           title={isOk ? t('send.txConfirmed') : t('send.txFailed')}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--ow-space-3)', alignItems: 'center' }}>
@@ -877,6 +826,45 @@ export function Send() {
           {t('send.max')}
         </Button>
       </div>
+
+      {/* ── Fee speed ───────────────────────────────────────────────── */}
+      {/* On Solana this sets the priority fee, which is what decides whether
+          the transaction lands during congestion. */}
+      {!['building', 'signing', 'broadcasting', 'pending'].includes(status) && (
+        <div>
+          <label style={{ fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-text-tertiary)' }}>
+            {t('send.feeTierLabel')}
+          </label>
+          <div style={{
+            display: 'flex', gap: 4, marginTop: 4,
+            padding: 3,
+            backgroundColor: 'var(--ow-bg-secondary)',
+            borderRadius: 'var(--ow-radius-sm)',
+          }}>
+            {(['slow', 'normal', 'fast'] as const).map(tier => (
+              <button
+                key={tier}
+                type="button"
+                onClick={() => setFeeTier(tier)}
+                aria-pressed={feeTier === tier}
+                style={{
+                  flex: 1,
+                  padding: '6px 10px',
+                  border: 'none',
+                  borderRadius: 'var(--ow-radius-sm)',
+                  fontSize: 'var(--ow-font-size-xs)',
+                  cursor: 'pointer',
+                  backgroundColor: feeTier === tier ? 'var(--ow-bg-tertiary)' : 'transparent',
+                  color: feeTier === tier ? 'var(--ow-text-primary)' : 'var(--ow-text-tertiary)',
+                  fontWeight: feeTier === tier ? 600 : 400,
+                }}
+              >
+                {t(`send.feeTier.${tier}`)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Gas fee row ─────────────────────────────────────────────── */}
       {feeInfo && (

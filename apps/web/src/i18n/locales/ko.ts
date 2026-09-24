@@ -89,7 +89,7 @@ export default {
     sentToken: '{{symbol}} 보냄',
     receivedToken: '{{symbol}} 받음',
     pending: '처리 중',
-    footer: 'OpenWallet · Apache-2.0 · v0.1.0',
+    footer: '7xCircle Wallet · Apache-2.0 · v0.1.0',
   },
 
   // ── 받기 ──
@@ -152,6 +152,12 @@ export default {
     max: '최대',
     networkFee: '네트워크 수수료',
     estimatingFee: '수수료 계산 중...',
+    feeTierLabel: '거래 속도',
+    feeTier: {
+      slow: '느림',
+      normal: '보통',
+      fast: '빠름',
+    },
     preparing: '거래 준비 중...',
     signing: '개인 키로 서명 중...',
     broadcasting: '네트워크에 전송 중...',

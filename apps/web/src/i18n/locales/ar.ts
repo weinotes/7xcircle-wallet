@@ -90,7 +90,7 @@ export default {
     sentToken: '{{symbol}} مرسل',
     receivedToken: '{{symbol}} مستلم',
     pending: 'قيد الانتظار',
-    footer: 'OpenWallet · Apache-2.0 · v0.1.0',
+    footer: '7xCircle Wallet · Apache-2.0 · v0.1.0',
   },
 
   // ── الاستلام ──
@@ -153,6 +153,12 @@ export default {
     max: 'الحد الأقصى',
     networkFee: 'رسوم الشبكة',
     estimatingFee: 'تقدير الرسوم...',
+    feeTierLabel: 'سرعة المعاملة',
+    feeTier: {
+      slow: 'بطيء',
+      normal: 'عادي',
+      fast: 'سريع',
+    },
     preparing: 'تحضير المعاملة...',
     signing: 'التوقيع بمفتاحك الخاص...',
     broadcasting: 'بث إلى الشبكة...',

@@ -20,15 +20,21 @@ export * from './solana/adapter.js';
 import { chainRegistry } from '@open-wallet/core';
 import { EvmAdapter } from './evm/adapter.js';
 import { SolanaAdapter } from './solana/adapter.js';
-import { CHAIN_CONFIGS } from './configs.js';
+import { CHAIN_CONFIGS, withRpcOverride } from './configs.js';
 
-/** Register all built-in chain adapters into the global registry */
+/**
+ * Register all built-in chain adapters into the global registry.
+ *
+ * Any RPC override set via `setRpcOverride` BEFORE this call is applied here,
+ * so adapters are constructed with the effective endpoint list.
+ */
 export function registerAllChains(): void {
   for (const config of CHAIN_CONFIGS) {
-    if (config.type === 'evm') {
-      chainRegistry.register(new EvmAdapter(config));
-    } else if (config.type === 'solana') {
-      chainRegistry.register(new SolanaAdapter(config));
+    const effective = withRpcOverride(config);
+    if (effective.type === 'evm') {
+      chainRegistry.register(new EvmAdapter(effective));
+    } else if (effective.type === 'solana') {
+      chainRegistry.register(new SolanaAdapter(effective));
     }
   }
 }

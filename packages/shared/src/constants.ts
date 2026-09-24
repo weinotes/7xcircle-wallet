@@ -41,6 +41,9 @@ export const DEFAULT_ACCOUNT_INDEX = 0;
 /** App display name */
 export const APP_NAME = 'OpenWallet';
 
+/** Public product brand. APP_NAME remains stable for storage compatibility. */
+export const BRAND_NAME = '7xCircle Wallet';
+
 /** Supported UI languages */
 export const LANGUAGES = [
   'en',

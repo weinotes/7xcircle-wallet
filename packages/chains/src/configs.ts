@@ -154,9 +154,11 @@ export const CHAIN_CONFIGS: ChainConfig[] = [
     type: 'solana',
     nativeSymbol: 'SOL',
     nativeDecimals: 9,
+    // Every entry MUST be mainnet. A devnet URL here is a failover hazard:
+    // when mainnet-beta is slow the adapter would silently switch clusters,
+    // showing devnet balances and broadcasting to the wrong network.
     rpcs: [
       'https://api.mainnet-beta.solana.com',
-      'https://api.devnet.solana.com',
       'https://solana-rpc.publicnode.com',
     ],
     explorer: 'https://explorer.solana.com',
@@ -178,4 +180,57 @@ export function getEvmConfigs(): ChainConfig[] {
 /** Get all Solana chain configs */
 export function getSolanaConfigs(): ChainConfig[] {
   return CHAIN_CONFIGS.filter(c => c.type === 'solana');
+}
+
+// ─── RPC overrides ───────────────────────────────────────────────────
+
+/**
+ * Per-chain RPC override — point a chain at a paid fast node
+ * (Helius / Triton / QuickNode) without editing the built-in configs.
+ *
+ * Deliberately an imperative setter rather than an env read: `CHAIN_CONFIGS`
+ * is a module-level const evaluated at import time, and browser bundlers do
+ * not expose `process.env` at runtime. Apps call `setRpcOverride(...)` before
+ * `registerAllChains()` with whatever their platform provides
+ * (`import.meta.env`, a remote config, a user setting).
+ */
+const rpcOverrides = new Map<string, string>();
+
+/** Override one chain's preferred RPC. Pass undefined to clear. */
+export function setRpcOverride(chainId: string, url: string | undefined): void {
+  if (url) rpcOverrides.set(chainId, url);
+  else rpcOverrides.delete(chainId);
+}
+
+/** Override several chains at once (skips empty values) */
+export function setRpcOverrides(map: Record<string, string | undefined>): void {
+  for (const [chainId, url] of Object.entries(map)) {
+    setRpcOverride(chainId, url);
+  }
+}
+
+/** Clear every override — mainly for tests */
+export function clearRpcOverrides(): void {
+  rpcOverrides.clear();
+}
+
+/** The override URL for a chain, if one is set */
+export function getRpcOverride(chainId: string): string | undefined {
+  return rpcOverrides.get(chainId);
+}
+
+/**
+ * Effective RPC list for a chain: the override first (fast path), then the
+ * built-in endpoints as failover.
+ */
+export function resolveRpcs(chainId: string, fallback: string[]): string[] {
+  const override = rpcOverrides.get(chainId);
+  if (!override) return fallback;
+  return [override, ...fallback.filter(url => url !== override)];
+}
+
+/** Apply any configured override to a chain config */
+export function withRpcOverride(config: ChainConfig): ChainConfig {
+  const rpcs = resolveRpcs(config.chainId, config.rpcs);
+  return rpcs === config.rpcs ? config : { ...config, rpcs };
 }

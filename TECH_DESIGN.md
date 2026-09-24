@@ -127,34 +127,83 @@ packages/core/
 这是整个钱包最重要的设计。不同链的签名算法、地址格式、交易结构完全不同，通过 **Adapter Pattern** 抽象统一：
 
 ```typescript
-// packages/core/src/chain/chain-adapter.ts
+// packages/core/src/chain/adapter.ts
 
 export interface ChainAdapter {
   // 链标识
   readonly chainId: string;           // e.g. "bsc-56", "eth-1", "solana"
-  readonly chainType: ChainType;       // "evm" | "solana" | "utxo" | ...
-  readonly nativeSymbol: string;       // e.g. "BNB", "ETH", "SOL"
+  readonly chainName: string;
+  readonly config: ChainConfig;
 
   // 地址
   deriveAddress(publicKey: Uint8Array, accountIndex: number): string;
   validateAddress(address: string): boolean;
 
   // 余额
-  getNativeBalance(address: string): Promise<bigint>;
-  getTokenBalance(address: string, tokenAddress: string): Promise<bigint>;
+  getNativeBalance(address: string): Promise<string>;
+  getTokenBalance(address: string, tokenAddress: string): Promise<string>;
+  getAllTokenBalances(address: string): Promise<TokenBalance[]>;
 
-  // 交易
-  buildTransaction(params: TxParams): Promise<RawTransaction>;
-  signTransaction(rawTx: RawTransaction, privateKey: Uint8Array): Promise<SignedTransaction>;
+  // 交易 —— 以「语义意图」为输入，而非链特定的原始字段
+  buildTransaction(intent: TxIntent, opts: BuildOpts): Promise<UnsignedTx>;
+  importExternalTransaction(tx: ExternalTx, opts: BuildOpts): Promise<UnsignedTx>;
+  signTransaction(tx: UnsignedTx, privateKey: Uint8Array): Promise<SignedTransaction>;
   sendTransaction(signedTx: SignedTransaction): Promise<string>; // 返回 txHash
+
+  // 合约读取（Swap 报价 / 授权查询的前置能力）
+  readContract(req: { to: string; data: string }): Promise<string>;
+  getAllowance(owner: string, token: string, spender: string): Promise<string>;
+
+  // 元数据与金额换算
+  getTokenInfo(token: string): Promise<TokenInfo>;
+  parseAmount(amount: string): string;
+  parseTokenAmount(amount: string, decimals: number): string;
+  formatTokenAmount(raw: string, decimals: number): string;
 
   // 交易历史（通过 Explorer API）
   getTransactionHistory(address: string): Promise<TransactionRecord[]>;
+  getTransactionStatus(txHash: string): Promise<TransactionRecord['status']>;
+  getExplorerTxUrl?(txHash: string): string | undefined;
 
   // Gas / 费用
-  estimateFees(params: TxParams): Promise<FeeEstimate>;
+  estimateFees(intent: TxIntent, opts: BuildOpts): Promise<FeeEstimate>;
+
+  // 链高度（Solana 用于判断 blockhash 是否过期）
+  getBlockHeight(): Promise<number>;
 }
 ```
+
+**为什么是 `TxIntent` 而不是原始交易字段？**
+
+早期版本让调用方直接拼 `RawTransaction`（`to` / `value` / `data`），结果 Solana 的 SPL 转账只能把意图编码成字符串塞进 `data`
+（`spl-token:{...}`），`from/to/value` 的语义被破坏，每加一种操作就要再抄一份分支。
+
+现在调用方只表达**想做什么**：
+
+```typescript
+export type TxIntent =
+  | { kind: 'native-transfer'; to: string; amountRaw: string }
+  | { kind: 'token-transfer'; token: string; decimals: number; to: string; amountRaw: string }
+  | { kind: 'contract-call'; to: string; data: string; valueRaw?: string }   // 仅 EVM
+  | { kind: 'approve'; token: string; spender: string; amountRaw: string };  // 仅 EVM
+```
+
+由各链 adapter 编译成自己的原生形式：
+
+- **EVM** → `{ to, value, data }` + nonce/gas/1559 费用
+- **Solana** → `TransactionInstruction[]` + `ComputeBudget` 优先费 → v0 `VersionedTransaction`
+
+`amountRaw` 一律是最小单位字符串（wei / lamports / 代币基础单位），避免浮点精度问题。
+
+**`ExternalTx` 用于「外部构建的交易」** —— Jupiter、0x、dApp 返回的是现成交易，不是可拆解的意图，
+通过 `importExternalTransaction` 导入后走同一套签名/广播路径。
+
+**优先费与重试（Solana）**：`buildTransaction` 会读取 `getRecentPrioritizationFees` 按费率档位
+（slow p50 / normal p75 / fast p90）出价，并前置 `setComputeUnitLimit`。计算上限设得宽松——手续费按
+`computeUnitsConsumed × price` 计费，**上限本身不花钱**，所以无需额外模拟。
+
+blockhash 过期后的重试**不在 adapter 内**：重建需要重新签名，而私钥生命周期由 UI 层
+（`apps/web/src/hooks/useTxFlow.ts`）管理，adapter 保持无状态、私钥不跨重试轮次驻留。
 
 **EVM 适配器实现要点**：
 - 基于 `viem`，配置 `PublicClient`（读链）+ `WalletClient`（签名）

@@ -14,39 +14,65 @@
  * limitations under the License.
  */
 /**
- * Solana chain adapter (stable @solana/web3.js v1.x).
+ * Solana chain adapter (@solana/web3.js v1.x).
  *
  * Solana differs fundamentally from EVM:
  *   - Ed25519 signatures (not secp256k1) — uses SLIP-0010 hardened paths only
  *   - Base58 encoded addresses
  *   - Account model vs UTXO
- *   - Transaction fee = 5000 lamports × signature count (no gas auctions)
+ *   - Fees are base (5000 lamports/signature) + a PRIORITY fee, which is what
+ *     actually decides whether a transaction lands during congestion
  *
- * Full transaction lifecycle (build → sign → send) is now implemented.
- * SPL token support is limited to balance queries; token transfers
- * would require building Associated Token Account instructions.
+ * Transactions are compiled to v0 VersionedTransaction so they can carry
+ * address lookup tables and be composed with aggregator-built transactions.
+ *
+ * Retry on blockhash expiry is deliberately NOT handled here — see
+ * `sendTransaction`. The adapter stays stateless and never holds a key
+ * across a multi-attempt loop.
  */
 
 import {
+  ComputeBudgetProgram,
   Connection,
-  PublicKey,
-  SystemProgram,
-  Transaction,
-  LAMPORTS_PER_SOL,
   Keypair,
+  PublicKey,
+  TransactionInstruction,
+  TransactionMessage,
+  VersionedTransaction,
 } from '@solana/web3.js';
+import { getAssociatedTokenAddress, getMint, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import bs58 from 'bs58';
 
+import {
+  base64ToBytes,
+  formatBalance,
+  fromHex,
+  parseAmount as parseAmountHelper,
+  toHex,
+} from '@open-wallet/shared';
 import type {
   ChainConfig,
+  ExternalTx,
   FeeEstimate,
-  RawTransaction,
+  FeeTier,
   SignedTransaction,
   TokenBalance,
+  TokenInfo,
   TransactionRecord,
+  TxIntent,
+  UnsignedTx,
 } from '@open-wallet/shared';
-import { parseAmount as parseAmountHelper } from '@open-wallet/shared';
-import type { ChainAdapter } from '@open-wallet/core';
+import type { BuildOpts, ChainAdapter } from '@open-wallet/core';
+
+import {
+  compileIntent,
+  pickPriorityFee,
+  COMPUTE_UNIT_LIMIT,
+  type CompileContext,
+} from './intent.js';
+
+/** Base fee per signature, in lamports. Solana charges this regardless of size. */
+const SIGNATURE_FEE_LAMPORTS = 5_000n;
 
 export class SolanaAdapter implements ChainAdapter {
   readonly chainId: string;
@@ -118,88 +144,130 @@ export class SolanaAdapter implements ChainAdapter {
     }
   }
 
-  // ─── Transactions ──────────────────────────────────────────────────
-
-  async buildTransaction(params: RawTransaction): Promise<RawTransaction> {
-    // Solana 需要一个 recentBlockhash 才能签名。我们在这里获取一次，
-    // 实际 Transaction 对象会在 signTransaction 中构建（保持 stateless）。
-    await this.connection.getLatestBlockhash('finalized').catch(() => {
-      // 如果 finalised 拿不到（罕见），用 confirmed
-      return this.connection.getLatestBlockhash('confirmed');
-    });
+  /**
+   * On-chain mint metadata.
+   *
+   * SPL mints carry no symbol or name — resolving those needs a token list.
+   * Until one is wired in we surface a truncated mint as the symbol, which
+   * is what the UI has always displayed.
+   */
+  async getTokenInfo(tokenAddress: string): Promise<TokenInfo> {
+    const mint = await getMint(
+      this.connection,
+      new PublicKey(tokenAddress),
+      'confirmed',
+      TOKEN_PROGRAM_ID,
+    );
 
     return {
-      ...params,
+      symbol: tokenAddress.slice(0, 6),
+      name: 'SPL Token',
+      decimals: mint.decimals,
+    };
+  }
+
+  // ─── Transactions ──────────────────────────────────────────────────
+
+  /**
+   * Compile an intent into an unsigned v0 transaction.
+   *
+   * This DOES hit the network — a Solana transaction cannot exist without a
+   * recent blockhash, and the priority fee needs recent fee samples. It runs
+   * once per send (at confirm time), never in a render loop;
+   * `estimateFees` is the cheap path for the typing case.
+   */
+  async buildTransaction(intent: TxIntent, opts: BuildOpts): Promise<UnsignedTx> {
+    const payer = new PublicKey(opts.from);
+    const feeTier = opts.feeTier ?? 'normal';
+
+    const ctx: CompileContext = {
+      destinationAtaExists: await this.destinationAtaExists(intent),
+    };
+    const ixs = await compileIntent(intent, payer, ctx);
+
+    const priceMicroLamports = await this.resolvePriorityFee(
+      this.collectWritableAccounts(ixs),
+      feeTier,
+    );
+
+    return this.compileV0(intent, payer, ixs, priceMicroLamports);
+  }
+
+  /**
+   * Adopt a transaction built elsewhere — a Jupiter swap response, a dApp
+   * request, an SDK. The payload already has its own blockhash and
+   * ComputeBudget instructions, so it is deserialized rather than rebuilt.
+   */
+  async importExternalTransaction(tx: ExternalTx, opts: BuildOpts): Promise<UnsignedTx> {
+    const bytes = tx.encoding === 'base64'
+      ? base64ToBytes(tx.payload)
+      : fromHex(tx.payload);
+
+    let decoded: VersionedTransaction;
+    try {
+      decoded = VersionedTransaction.deserialize(bytes);
+    } catch (cause) {
+      throw new Error(`Could not deserialize Solana transaction: ${(cause as Error).message}`);
+    }
+
+    // The builder's own expiry is not carried in the serialized transaction,
+    // so take the current one. It is only used to bound the confirm wait.
+    const { lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+
+    return {
+      chainType: 'solana',
       chainId: this.config.chainId,
+      serialized: toHex(decoded.serialize()),
+      versioned: decoded.version === 0,
+      recentBlockhash: decoded.message.recentBlockhash,
+      lastValidBlockHeight,
     };
   }
 
   async signTransaction(
-    rawTx: RawTransaction,
+    tx: UnsignedTx,
     privateKey: Uint8Array,
   ): Promise<SignedTransaction> {
-    // Solana 用 ed25519 — privateKey 是 32-byte ed25519 seed（来自 SLIP-0010）
-    const keypair = Keypair.fromSeed(privateKey);
-
-    const fromPubkey = new PublicKey(rawTx.from);
-    const toPubkey = new PublicKey(rawTx.to);
-    const lamports = BigInt(rawTx.value).toString();
-
-    // 获取最新 blockhash
-    const { blockhash } = await this.connection.getLatestBlockhash('finalized');
-
-    // 构建 Transaction
-    const transaction = new Transaction({
-      recentBlockhash: blockhash,
-      feePayer: fromPubkey,
-    }).add(
-      SystemProgram.transfer({
-        fromPubkey,
-        toPubkey,
-        lamports: BigInt(lamports),
-      }),
-    );
-
-    // 签名
-    transaction.sign(keypair);
-
-    // 取 base58 signature
-    const sigBytes = transaction.signatures[0].signature;
-    if (!sigBytes) {
-      throw new Error('Signing produced no signature');
+    if (tx.chainType !== 'solana') {
+      throw new Error(`SolanaAdapter cannot sign a ${tx.chainType} transaction`);
     }
 
-    return {
-      raw: transaction,
-      signature: bs58.encode(sigBytes),
-    };
+    // Solana uses ed25519 — privateKey is the 32-byte seed from SLIP-0010
+    const keypair = Keypair.fromSeed(privateKey);
+    const decoded = VersionedTransaction.deserialize(fromHex(tx.serialized));
+    decoded.sign([keypair]);
+
+    const sigBytes = decoded.signatures[0];
+    if (!sigBytes) throw new Error('Signing produced no signature');
+
+    // `raw` must carry the SIGNED bytes — serializing `tx.serialized` here
+    // would broadcast an unsigned transaction, which the cluster rejects.
+    return { raw: toHex(decoded.serialize()), signature: bs58.encode(sigBytes) };
   }
 
   async sendTransaction(signedTx: SignedTransaction): Promise<string> {
-    const transaction = signedTx.raw as Transaction;
+    const bytes = fromHex(signedTx.raw as string);
 
-    // 用 preflight check 确保 tx 不会立即 fail
-    const signature = await this.connection.sendRawTransaction(
-      transaction.serialize({ requireAllSignatures: false }),
-      {
-        preflightCommitment: 'confirmed',
-        maxRetries: 3,
-      },
-    );
-
-    return signature;
+    return this.connection.sendRawTransaction(bytes, {
+      // Preflight so the user gets a real error instead of a silently
+      // dropped transaction.
+      preflightCommitment: 'confirmed',
+      maxRetries: 3,
+    });
   }
 
   // ─── Explorer ──────────────────────────────────────────────────────
 
-  /** Derive Solscan or local explorer URL for a tx hash */
+  /**
+   * Explorer URL for a tx hash.
+   *
+   * Keys off the explicit `testnet` flag rather than sniffing the RPC URLs —
+   * sniffing appended `?cluster=devnet` to mainnet links whenever any
+   * configured endpoint happened to contain the string "devnet".
+   */
   getExplorerTxUrl(txHash: string): string {
     const base = this.config.explorer ?? 'https://explorer.solana.com';
-    // Determine if we're on devnet
-    const isDevnet = this.config.rpcs.some(r =>
-      r.toLowerCase().includes('devnet') || r.toLowerCase().includes('test'),
-    );
-    const cluster = isDevnet ? '?cluster=devnet' : '';
+    const cluster = this.config.testnet ? '?cluster=devnet' : '';
     return `${base.replace(/\/$/, '')}/tx/${txHash}${cluster}`;
   }
 
@@ -326,41 +394,174 @@ export class SolanaAdapter implements ChainAdapter {
 
   // ─── Fees ──────────────────────────────────────────────────────────
 
-  async estimateFees(params: RawTransaction): Promise<FeeEstimate> {
+  /**
+   * Cheap fee estimate for the typing path.
+   *
+   * Deliberately does NOT simulate: the compute limit is free (you pay for
+   * units *consumed*, not the ceiling), so a generous constant avoids an
+   * RPC round trip per keystroke. The estimate is therefore an upper bound
+   * on the priority-fee component.
+   */
+  async estimateFees(intent: TxIntent, opts: BuildOpts): Promise<FeeEstimate> {
+    const feeTier = opts.feeTier ?? 'normal';
+    const cuLimit = BigInt(COMPUTE_UNIT_LIMIT[intent.kind]);
+
+    let priceMicroLamports = 0;
     try {
-      // Solana fee = base fee (5000 lamports per signature) + priority fee
-      // A simple SystemProgram.transfer has 1 signature → 5000 lamports base
-      // We could use connection.getFeeForMessage for exact value, but that
-      // requires building a full Message — keep it simple here.
-      const SIGNATURE_FEE = 5000n;
-      const signatureCount = 1n; // one payer signature
-      const baseFee = SIGNATURE_FEE * signatureCount;
-
-      // Optional priority fee — default 0 (can be upped for congestion)
-      const priorityFee = 0n;
-      const totalFee = baseFee + priorityFee;
-
-      return {
-        level: 'medium',
-        gasLimit: '2000',          // Solana compute units (≈ 2000 for a transfer)
-        gasPrice: baseFee.toString(),
-        totalFee: totalFee.toString(),
-      };
+      const samples = await this.connection.getRecentPrioritizationFees({});
+      priceMicroLamports = pickPriorityFee(samples.map(s => s.prioritizationFee), feeTier);
     } catch {
-      // Fallback — hardcoded 5000 lamports (default transfer fee)
-      const fallback = '5000';
-      void params;
-      return {
-        level: 'medium',
-        gasLimit: '2000',
-        gasPrice: fallback,
-        totalFee: fallback,
-      };
+      priceMicroLamports = pickPriorityFee([], feeTier);
     }
+
+    const priorityFee = (BigInt(priceMicroLamports) * cuLimit) / 1_000_000n;
+    const totalFee = SIGNATURE_FEE_LAMPORTS + priorityFee;
+
+    return {
+      level: feeTier,
+      gasLimit: cuLimit.toString(),
+      // On Solana this is the per-compute-unit price in micro-lamports,
+      // NOT the total fee — `totalFee` is the number to display.
+      gasPrice: priceMicroLamports.toString(),
+      totalFee: totalFee.toString(),
+    };
   }
 
   /** Convert human-readable SOL amount to lamports string */
   parseAmount(amount: string): string {
     return parseAmountHelper(amount, this.config.nativeDecimals);
+  }
+
+  /** Convert a human-readable SPL amount to raw units */
+  parseTokenAmount(amount: string, decimals: number): string {
+    return parseAmountHelper(amount, decimals);
+  }
+
+  /** Convert raw SPL units to a human-readable string */
+  formatTokenAmount(raw: string, decimals: number): string {
+    return formatBalance(raw, decimals);
+  }
+
+  // ─── Contracts ─────────────────────────────────────────────────────
+
+  /**
+   * Not supported. A Solana read needs a program id PLUS its account metas,
+   * which `{ to, data }` cannot express. Solana-side reads (swap quotes,
+   * pool state) go through the protocol's own HTTP API instead.
+   */
+  async readContract(): Promise<string> {
+    throw new Error(
+      'readContract is not supported on Solana — a read requires account metas, ' +
+      'not just a program id and data. Use the protocol API instead.',
+    );
+  }
+
+  /** Solana has no approval concept — approve the full amount. */
+  async getAllowance(): Promise<string> {
+    return (2n ** 256n - 1n).toString();
+  }
+
+  /** Current slot height — used to detect blockhash expiry */
+  async getBlockHeight(): Promise<number> {
+    return this.connection.getBlockHeight('confirmed');
+  }
+
+  // ─── Internals ─────────────────────────────────────────────────────
+
+  /** Assemble a v0 transaction from instructions + compute budget */
+  private async compileV0(
+    intent: TxIntent,
+    payer: PublicKey,
+    ixs: TransactionInstruction[],
+    priceMicroLamports: number,
+  ): Promise<UnsignedTx> {
+    // ComputeBudget instructions conventionally come first. The limit is a
+    // ceiling — Solana charges units *consumed*, so a generous value costs
+    // nothing and protects against under-estimation.
+    const instructions = [
+      ComputeBudgetProgram.setComputeUnitLimit({ units: COMPUTE_UNIT_LIMIT[intent.kind] }),
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priceMicroLamports }),
+      ...ixs,
+    ];
+
+    const { blockhash, lastValidBlockHeight } =
+      await this.connection.getLatestBlockhash('confirmed');
+
+    const message = new TransactionMessage({
+      payerKey: payer,
+      recentBlockhash: blockhash,
+      instructions,
+    }).compileToV0Message();
+
+    const transaction = new VersionedTransaction(message);
+
+    return {
+      chainType: 'solana',
+      chainId: this.config.chainId,
+      serialized: toHex(transaction.serialize()),
+      versioned: true,
+      recentBlockhash: blockhash,
+      lastValidBlockHeight,
+    };
+  }
+
+  /**
+   * Does the recipient already hold this mint?
+   *
+   * On lookup failure we assume NOT, so the create instruction is included.
+   * A missing ATA makes the transfer fail outright, whereas an unexpected
+   * create only fails if the account appeared in the meantime.
+   */
+  private async destinationAtaExists(intent: TxIntent): Promise<boolean> {
+    if (intent.kind !== 'token-transfer') return false;
+
+    try {
+      const ata = await getAssociatedTokenAddress(
+        new PublicKey(intent.token),
+        new PublicKey(intent.to),
+      );
+      return (await this.connection.getAccountInfo(ata)) !== null;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Query recent priority-fee samples and pick a price for the tier.
+   *
+   * Scoping the sample to the accounts this transaction touches gives a
+   * sharper price than the network-wide average, because contention is
+   * per-account.
+   */
+  private async resolvePriorityFee(
+    writable: PublicKey[],
+    tier: FeeTier,
+  ): Promise<number> {
+    try {
+      const samples = await this.connection.getRecentPrioritizationFees(
+        writable.length > 0 ? { lockedWritableAccounts: writable } : {},
+      );
+      return pickPriorityFee(samples.map(s => s.prioritizationFee), tier);
+    } catch {
+      return pickPriorityFee([], tier);
+    }
+  }
+
+  /** Collect the writable accounts an instruction set touches */
+  private collectWritableAccounts(instructions: TransactionInstruction[]): PublicKey[] {
+    const seen = new Set<string>();
+    const writable: PublicKey[] = [];
+
+    for (const ix of instructions) {
+      for (const meta of ix.keys) {
+        if (!meta.isWritable) continue;
+        const key = meta.pubkey.toBase58();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        writable.push(meta.pubkey);
+      }
+    }
+
+    return writable;
   }
 }
