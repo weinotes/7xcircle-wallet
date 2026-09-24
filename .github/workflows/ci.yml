@@ -61,8 +61,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # --passWithNoTests: suite not written yet (vitest skeleton in place)
-      - run: pnpm exec vitest run --passWithNoTests
+      # Real per-package test runs via turbo; fails if a suite breaks.
+      - run: pnpm test
 
   build:
     name: Build
