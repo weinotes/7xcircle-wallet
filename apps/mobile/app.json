@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "7xCircle Wallet",
+    "slug": "7xcircle-wallet",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "openwallet",
+    "android": {
+      "package": "com.openwallet.app",
+      "permissions": [],
+      "adaptiveIcon": {
+        "backgroundColor": "#101114"
+      }
+    }
+  }
+}

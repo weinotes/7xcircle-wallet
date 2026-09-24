@@ -1,0 +1,28 @@
+{
+  "name": "@open-wallet/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "typecheck": "tsc --noEmit",
+    "build": "expo export --platform android",
+    "clean": "rm -rf .expo dist"
+  },
+  "dependencies": {
+    "@open-wallet/chains": "workspace:*",
+    "@open-wallet/core": "workspace:*",
+    "@open-wallet/shared": "workspace:*",
+    "expo": "~53.0.0",
+    "expo-secure-store": "~14.2.3",
+    "expo-status-bar": "~2.2.3",
+    "react": "19.0.0",
+    "react-native": "0.79.2",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.0.10",
+    "typescript": "~5.8.3"
+  }
+}
