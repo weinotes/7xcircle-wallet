@@ -1,10 +1,10 @@
-# OpenWallet
+# 7xCircle Wallet
 
 中文 | [English](README.md)
 
 **作者：** Davey Wong <wgwcko@gmail.com>
 
-开源、多链、非托管的加密货币钱包。私钥永不出设备 — 无后端依赖，完全可审计。
+7xCircle Wallet 是开源、多链、非托管的加密货币钱包。私钥永不出设备 — 无后端依赖，完全可审计。
 
 > ⚠️ **Alpha / 开发中** — 仍在积极开发，请勿存入大额资产。
 
@@ -12,7 +12,7 @@
 
 - HD 钱包创建 / 导入（BIP39 助记词 + 私钥）
 - 多链统一资产管理：Ethereum、BNB Chain、Polygon、Arbitrum、Optimism、Base、Avalanche、Solana
-- 原生代币 + ERC20/BEP20/SPL 代币余额
+- 原生代币 + ERC20/BEP20/SPL 代币余额与转账
 - 原生币发送，动态 Gas 估算（慢 / 中 / 快 / 自定义）
 - 区块浏览器 API 查询交易历史
 - 加密保险库：AES-256-GCM + PBKDF2-SHA512（20 万次迭代）
@@ -36,7 +36,9 @@
 ```
 open-wallet/
 ├── apps/
-│   └── web/          # Web 应用（React + Vite + PWA）
+│   ├── web/          # Web 应用（React + Vite）
+│   ├── extension/    # Chrome/Chromium MV3 浏览器插件
+│   └── mobile/       # Android 应用（Expo / React Native）
 ├── packages/
 │   ├── core/         # 钱包核心：密钥、保险库加密、会话、链抽象
 │   ├── chains/       # 链适配器（EVM / Solana）
@@ -53,7 +55,24 @@ pnpm install
 pnpm dev          # 启动 Web 应用（Vite 开发服务器）
 pnpm build        # 构建所有包 + Web
 pnpm typecheck    # 全工作区类型检查
+pnpm --filter @open-wallet/mobile start   # 启动 Android 开发环境
+pnpm --filter @open-wallet/mobile android  # 在 Android 设备或模拟器运行
 ```
+
+### Android 版本
+
+Android 客户端使用 Expo / React Native，并复用同一套钱包核心和链适配器。
+加密后的 Vault 使用 Android SecureStore 保存。安装 Android Studio 和 SDK 后，
+执行 `pnpm --filter @open-wallet/mobile android` 即可构建并运行。
+当前移动端 MVP 支持创建/导入钱包、安全解锁、BNB 余额及原生 BNB 转账。
+Solana 移动端页面正在接入共享链适配器。
+
+### 浏览器插件
+
+执行 `pnpm --filter @open-wallet/extension build`，再在 Chrome 或 Chromium
+浏览器中将 `apps/extension/dist` 作为“已解压的扩展程序”加载。
+插件 Popup 支持完整钱包界面，页面注入的 EIP-1193 provider 已支持 BNB 链和
+只读账户发现；交易审批界面仍在继续完善。
 
 要求 Node.js >= 20.19，pnpm >= 9。
 
@@ -69,7 +88,7 @@ pnpm typecheck    # 全工作区类型检查
 ## 路线图
 
 - Phase 1（当前）：MVP — 多链收发、加密保险库、Web 应用
-- Phase 2：移动端（React Native）与桌面端（Tauri）、硬件钱包（Ledger）、NFT 视图、更多链
+- Phase 2：移动端（React Native）与桌面端（Tauri）、硬件钱包（Ledger）、NFT 视图、更多链（Tron、Bitcoin 及 PSBT 支持）
 - Phase 3：DeFi — DApp 浏览器、Swap 聚合、质押、WalletConnect v2
 
 ## 许可证

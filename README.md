@@ -1,10 +1,10 @@
-# OpenWallet
+# 7xCircle Wallet
 
 [简体中文](README.zh-CN.md) | English
 
 **Author:** Davey Wong <wgwcko@gmail.com>
 
-Open-source, multi-chain, non-custodial cryptocurrency wallet. Private keys never leave your device — no backend, fully auditable.
+7xCircle Wallet is an open-source, multi-chain, non-custodial cryptocurrency wallet. Private keys never leave your device — no backend, fully auditable.
 
 > ⚠️ **Alpha / WIP** — under active development. Do not store significant funds yet.
 
@@ -12,7 +12,7 @@ Open-source, multi-chain, non-custodial cryptocurrency wallet. Private keys neve
 
 - HD wallet creation & import (BIP39 mnemonic + private key)
 - Multi-chain unified asset view: Ethereum, BNB Chain, Polygon, Arbitrum, Optimism, Base, Avalanche, Solana
-- Native + ERC20/BEP20/SPL token balances
+- Native + ERC20/BEP20/SPL token balances and transfers
 - Send native tokens with dynamic gas estimation (slow / normal / fast / custom)
 - Transaction history via block explorer APIs
 - Encrypted vault: AES-256-GCM + PBKDF2-SHA512 (200,000 iterations)
@@ -36,7 +36,9 @@ Open-source, multi-chain, non-custodial cryptocurrency wallet. Private keys neve
 ```
 open-wallet/
 ├── apps/
-│   └── web/          # Web app (React + Vite + PWA)
+│   ├── web/          # Web app (React + Vite)
+│   ├── extension/    # Chrome/Chromium MV3 extension
+│   └── mobile/       # Android app (Expo / React Native)
 ├── packages/
 │   ├── core/         # Wallet core: keys, vault encryption, session, chain abstraction
 │   ├── chains/       # Chain adapters (EVM / Solana)
@@ -53,7 +55,26 @@ pnpm install
 pnpm dev          # start web app (Vite dev server)
 pnpm build        # build all packages + web
 pnpm typecheck    # type-check all workspaces
+pnpm --filter @open-wallet/mobile start  # start Android development
+pnpm --filter @open-wallet/mobile android # build/run on Android device or emulator
 ```
+
+### Android
+
+The Android app is an Expo/React Native client using the same wallet core and chain adapters.
+The encrypted vault is stored with Android SecureStore. Run `pnpm install`, then use
+`pnpm --filter @open-wallet/mobile android` with Android Studio/SDK installed.
+The current mobile MVP supports wallet creation/import, secure unlock, BNB balance,
+and native BNB transfers. Solana mobile screens are being wired into
+the shared adapters.
+
+### Browser extension
+
+Build with `pnpm --filter @open-wallet/extension build`, then load
+`apps/extension/dist` as an unpacked extension in Chrome or another Chromium browser.
+The popup supports the wallet UI, and the injected EIP-1193 provider exposes the
+current BNB chain and read-only account discovery while transaction approval UI is
+being completed.
 
 Requires Node.js >= 20.19 and pnpm >= 9.
 
@@ -69,7 +90,7 @@ See `TECH_DESIGN.md` for the full technical design and security audit checklist.
 ## Roadmap
 
 - Phase 1 (current): MVP — multi-chain send/receive, encrypted vault, web app
-- Phase 2: Mobile (React Native) & Desktop (Tauri), hardware wallet (Ledger), NFT view, more chains
+- Phase 2: Mobile (React Native) & Desktop (Tauri), hardware wallet (Ledger), NFT view, more chains (Tron, Bitcoin with PSBT)
 - Phase 3: DeFi — DApp browser, swap aggregation, staking, WalletConnect v2
 
 ## License
