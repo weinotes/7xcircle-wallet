@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Mobile Swap goes multi-chain: an EVM route section gated on a build-time
+  `EXPO_PUBLIC_ZEROX_API_KEY` (0x quotes, approve → wait → swap chaining),
+  chain chips across every held account, and custom-contract pairs —
+  keyless builds honestly stay Solana-only instead of offering dead routes.
 - Address-poisoning guard: a recipient that shares the first 5 and last 4
   characters with any address you have previously sent to on that chain —
   without being identical — triggers a red alert on Send and again on the

@@ -14,54 +14,129 @@
  * limitations under the License.
  */
 /**
- * Swap tab — Jupiter-routed swaps on Solana (mobile twin of the web page).
+ * Swap tab — the mobile twin of the web Swap page.
  *
- * Quote (debounced) → review → /swap build → importExternalTransaction →
- * local sign → broadcast. Keys never leave the session; the aggregator
- * only ever sees the public key it is asked to build a tx for.
+ *   Solana → Jupiter  (quote, then /swap builds the wire transaction)
+ *   EVM    → 0x v2    (the quote already carries the calldata to send)
+ *
+ * The EVM routes appear only when an 0x key was embedded at build time
+ * (EXPO_PUBLIC_ZEROX_API_KEY) — quoting without one returns nothing, so
+ * listing dead chains would be a lie. EVM ERC20 sells may need an approval
+ * first: approve → wait → swap, and an unconfirmed approval never chains.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { chainRegistry } from '@7xcircle/core';
 import {
+  CHAIN_CONFIGS,
   SWAP_TOKEN_OPTIONS,
   fetchQuote,
   fetchSwapTransaction,
+  fetchZeroExQuote,
+  getEvmSwapTokens,
+  hasZeroExKey,
+  zeroExQuoteToIntents,
+  ZEROX_CHAIN_IDS,
+  type EvmSwapToken,
   type JupiterQuote,
-  type SwapTokenOption,
+  type ZeroExQuote,
 } from '@7xcircle/chains';
 import { formatBalance, parseAmount } from '@7xcircle/shared';
 import type { Account } from '@7xcircle/shared';
 import { Button, shorten } from '../components';
-import { sendExternalTx } from '../tx';
+import { sendExternalTx, sendTx } from '../tx';
+import '../config';
 import { styles } from '../theme';
 
-const SOLANA_CHAIN = 'solana';
 const SLIPPAGE_OPTIONS = [50, 100, 300];
 
-export function Swap({ accounts }: { accounts: Account[] }) {
-  const account = accounts.find(a => a.chainId === SOLANA_CHAIN);
-  const adapter = chainRegistry.get(SOLANA_CHAIN);
+/** One side of the pair, normalized across Solana mints and EVM contracts */
+interface TokenChoice {
+  address: string;
+  symbol: string;
+  decimals: number;
+  isNative: boolean;
+}
 
-  const [from, setFrom] = useState<SwapTokenOption>(SWAP_TOKEN_OPTIONS[0]);
-  const [to, setTo] = useState<SwapTokenOption>(SWAP_TOKEN_OPTIONS[1]);
+/** A network this screen can actually route on, given the unlocked accounts */
+interface ChainOption {
+  chainId: string;
+  label: string;
+  kind: 'solana' | 'evm';
+  decimal?: number;
+}
+
+function jupiterChoice(symbol: string): TokenChoice | undefined {
+  const t = SWAP_TOKEN_OPTIONS.find(x => x.symbol === symbol);
+  return t ? { address: t.mint, symbol: t.symbol, decimals: t.decimals, isNative: symbol === 'SOL' } : undefined;
+}
+
+export function Swap({ accounts }: { accounts: Account[] }) {
+  const chainOptions = useMemo<ChainOption[]>(() => {
+    const out: ChainOption[] = [];
+    for (const cfg of CHAIN_CONFIGS) {
+      if (cfg.testnet) continue;
+      if (!accounts.some(a => a.chainId === cfg.chainId)) continue;
+      if (cfg.type === 'solana') {
+        out.push({ chainId: cfg.chainId, label: cfg.name, kind: 'solana' });
+      } else if (
+        cfg.type === 'evm' &&
+        cfg.chainIdDecimal !== undefined &&
+        ZEROX_CHAIN_IDS.includes(cfg.chainIdDecimal) &&
+        hasZeroExKey()
+      ) {
+        out.push({ chainId: cfg.chainId, label: cfg.name, kind: 'evm', decimal: cfg.chainIdDecimal });
+      }
+    }
+    return out;
+  }, [accounts]);
+
+  const [selectedChain, setSelectedChain] = useState<string>('');
+  const active = chainOptions.find(o => o.chainId === selectedChain) ?? chainOptions[0];
+  const account = active ? accounts.find(a => a.chainId === active.chainId) : undefined;
+  const adapter = active ? chainRegistry.get(active.chainId) : undefined;
+
+  const evmTokens = useMemo<TokenChoice[]>(
+    () => (active?.kind === 'evm' ? getEvmSwapTokens(active.decimal ?? 0).map(evmToChoice) : []),
+    [active],
+  );
+
+  const [from, setFrom] = useState<TokenChoice | undefined>(undefined);
+  const [to, setTo] = useState<TokenChoice | undefined>(undefined);
   const [amount, setAmount] = useState('');
   const [slippage, setSlippage] = useState(100);
-  const [customMint, setCustomMint] = useState('');
-  const [quote, setQuote] = useState<JupiterQuote | null>(null);
+  const [customAddr, setCustomAddr] = useState('');
+  const [jupQuote, setJupQuote] = useState<JupiterQuote | null>(null);
+  const [zxQuote, setZxQuote] = useState<ZeroExQuote | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [quoteError, setQuoteError] = useState('');
   const [executing, setExecuting] = useState(false);
   const [status, setStatus] = useState('');
   const quoteSeq = useRef(0);
 
-  // debounced quote refresh
+  // Re-seed the pair whenever the network changes
+  useEffect(() => {
+    if (!active) return;
+    if (active.kind === 'solana') {
+      setFrom(jupiterChoice('SOL'));
+      setTo(jupiterChoice('USDC'));
+    } else {
+      setFrom(evmTokens[0]);
+      setTo(evmTokens[1]);
+    }
+    setAmount('');
+    setJupQuote(null);
+    setZxQuote(null);
+  }, [active, evmTokens]);
+
+  // debounced quote refresh — one effect serves both venues
   useEffect(() => {
     const seq = ++quoteSeq.current;
-    setQuote(null);
+    setJupQuote(null);
+    setZxQuote(null);
     setQuoteError('');
-    if (!account || !amount || Number(amount) <= 0) return;
+    if (!account || !active || !from || !to || !amount || Number(amount) <= 0) return;
     let amountRaw = '';
     try {
       amountRaw = parseAmount(amount, from.decimals);
@@ -71,18 +146,53 @@ export function Swap({ accounts }: { accounts: Account[] }) {
     }
     setQuoting(true);
     const timer = setTimeout(() => {
-      fetchQuote({
-        inputMint: from.mint,
-        outputMint: to.mint,
-        amountRaw,
-        slippageBps: slippage,
-      })
-        .then(q => { if (quoteSeq.current === seq) setQuote(q); })
-        .catch(e => { if (quoteSeq.current === seq) setQuoteError(e instanceof Error ? e.message : 'Quote failed'); })
-        .finally(() => { if (quoteSeq.current === seq) setQuoting(false); });
+      const done = (fn: () => Promise<void>) => fn().finally(() => {
+        if (quoteSeq.current === seq) setQuoting(false);
+      });
+      if (active.kind === 'solana') {
+        done(async () => {
+          try {
+            const q = await fetchQuote({ inputMint: from.address, outputMint: to.address, amountRaw, slippageBps: slippage });
+            if (quoteSeq.current === seq) setJupQuote(q);
+          } catch (e) {
+            if (quoteSeq.current === seq) setQuoteError(e instanceof Error ? e.message : 'Quote failed');
+          }
+        });
+      } else {
+        done(async () => {
+          try {
+            const q = await fetchZeroExQuote({
+              chainId: active.decimal ?? 0,
+              sellToken: from.address,
+              buyToken: to.address,
+              sellAmountRaw: amountRaw,
+              taker: account.address,
+              slippageBps: slippage,
+            });
+            if (quoteSeq.current !== seq) return;
+            if (q) setZxQuote(q);
+            else setQuoteError('No route for this pair right now.');
+          } catch (e) {
+            if (quoteSeq.current === seq) setQuoteError(e instanceof Error ? e.message : 'Quote failed');
+          }
+        });
+      }
     }, 450);
     return () => clearTimeout(timer);
-  }, [account, amount, from, to, slippage]);
+  }, [account, active, amount, from, to, slippage]);
+
+  if (chainOptions.length === 0 || !active || !account || !adapter) {
+    return (
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.screen}>
+        <Text style={styles.heading}>Swap</Text>
+        <Text style={styles.body}>
+          {hasZeroExKey()
+            ? 'Swap needs at least one supported chain account.'
+            : 'Swap runs on Solana — this build has no 0x key embedded (set EXPO_PUBLIC_ZEROX_API_KEY for EVM routes).'}
+        </Text>
+      </ScrollView>
+    );
+  }
 
   const swapDirection = () => {
     setFrom(to);
@@ -90,31 +200,53 @@ export function Swap({ accounts }: { accounts: Account[] }) {
     setAmount('');
   };
 
-  const applyCustomMint = (which: 'from' | 'to') => {
-    const mint = customMint.trim();
-    if (!mint) return;
-    // same convention as the web Swap page: unverified mints assume 6
-    // decimals (the dominant SPL choice); Jupiter still routes by mint
-    const opt: SwapTokenOption = { mint, symbol: shorten(mint, 4, 4), decimals: 6 };
+  const applyCustomAddress = (which: 'from' | 'to') => {
+    const addr = customAddr.trim();
+    if (!addr) return;
+    // Unverified custom assets assume 18 decimals on EVM (the dominant EVM
+    // choice) and 6 on Solana — pasted tokens are the user's responsibility,
+    // the same convention the web page documents.
+    const opt: TokenChoice = {
+      address: addr,
+      symbol: shorten(addr, 4, 4),
+      decimals: active.kind === 'evm' ? 18 : 6,
+      isNative: false,
+    };
     if (which === 'from') setFrom(opt); else setTo(opt);
-    setCustomMint('');
+    setCustomAddr('');
     setAmount('');
   };
 
   const execute = async () => {
-    if (!account || !adapter || !quote) return;
+    if (!from || !to) return;
     setExecuting(true);
     setStatus('');
     try {
-      const txBase64 = await fetchSwapTransaction({ quote, userPublicKey: account.address });
-      const hash = await sendExternalTx({
-        adapter,
-        account,
-        tx: { encoding: 'base64', payload: txBase64, versioned: true },
-      });
-      setStatus(`Swapped: ${shorten(hash, 12, 8)}`);
+      if (active.kind === 'solana' && jupQuote) {
+        const txBase64 = await fetchSwapTransaction({ quote: jupQuote, userPublicKey: account.address });
+        const hash = await sendExternalTx({
+          adapter,
+          account,
+          tx: { encoding: 'base64', payload: txBase64, versioned: true },
+        });
+        setStatus(`Swapped: ${shorten(hash, 12, 8)}`);
+      } else if (active.kind === 'evm' && zxQuote) {
+        const intents = zeroExQuoteToIntents(zxQuote);
+        if (intents.approve) {
+          // An unconfirmed approval must never chain into the swap — the
+          // swap would revert and burn gas for nothing.
+          setStatus('Approving spend…');
+          await sendTx({ adapter, account, intent: intents.approve });
+        }
+        setStatus('Swapping…');
+        const hash = await sendTx({ adapter, account, intent: intents.swap });
+        setStatus(`Swapped: ${shorten(hash, 12, 8)}`);
+      } else {
+        throw new Error('Quote is stale — request a fresh one.');
+      }
       setAmount('');
-      setQuote(null);
+      setJupQuote(null);
+      setZxQuote(null);
     } catch (cause) {
       setStatus(cause instanceof Error ? cause.message : 'Swap failed — request a fresh quote and retry.');
     } finally {
@@ -122,31 +254,42 @@ export function Swap({ accounts }: { accounts: Account[] }) {
     }
   };
 
-  if (!account) {
-    return (
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.screen}>
-        <Text style={styles.heading}>Swap</Text>
-        <Text style={styles.body}>Swap runs on Solana — this wallet has no Solana account.</Text>
-      </ScrollView>
-    );
-  }
+  const ready = active.kind === 'solana' ? jupQuote !== null : zxQuote !== null;
+  const outChoice = to;
+  const outText = jupQuote
+    ? `You receive ≥ ${formatBalance(jupQuote.otherAmountThreshold, outChoice?.decimals ?? 6, 6)} ${outChoice?.symbol ?? ''}`
+    : zxQuote && outChoice
+      ? `You receive ≈ ${formatBalance(zxQuote.buyAmount, outChoice.decimals, 6)} ${outChoice.symbol}`
+      : '';
 
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
       <Text style={styles.heading}>Swap</Text>
 
+      {/* chain chips — only routes this build can actually serve */}
+      <View style={styles.chipRow}>
+        {chainOptions.map(opt => {
+          const on = opt.chainId === active.chainId;
+          return (
+            <Pressable key={opt.chainId} onPress={() => setSelectedChain(opt.chainId)} style={[styles.chip, on && styles.chipActive]}>
+              <Text style={[styles.chipText, on && styles.chipTextActive]}>{opt.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       <View style={styles.card}>
-        <TokenPicker label="From" token={from} onPress={() => {}} tokens={SWAP_TOKEN_OPTIONS} onPick={setFrom} />
+        {from && <TokenPicker label="From" token={from} tokens={active.kind === 'solana' ? SWAP_TOKEN_OPTIONS.map(jupToChoice) : evmTokens} onPick={setFrom} />}
         <Pressable onPress={swapDirection} style={styles.badge}>
           <Text style={styles.badgeText}>⇅ switch</Text>
         </Pressable>
-        <TokenPicker label="To" token={to} onPress={() => {}} tokens={SWAP_TOKEN_OPTIONS} onPick={setTo} />
+        {to && <TokenPicker label="To" token={to} tokens={active.kind === 'solana' ? SWAP_TOKEN_OPTIONS.map(jupToChoice) : evmTokens} onPick={setTo} />}
 
         <TextInput
           keyboardType="decimal-pad"
           value={amount}
           onChangeText={setAmount}
-          placeholder={`Amount (${from.symbol})`}
+          placeholder={`Amount (${from?.symbol ?? ''})`}
           placeholderTextColor="#78818f"
           style={styles.input}
         />
@@ -164,46 +307,54 @@ export function Swap({ accounts }: { accounts: Account[] }) {
 
         {quoting && <Text style={styles.status}>Fetching best route…</Text>}
         {quoteError !== '' && <Text style={styles.warning}>{quoteError}</Text>}
-        {quote && (
+        {(jupQuote || zxQuote) && (
           <View style={styles.requestBox}>
-            <Text style={styles.requestText}>
-              You receive ≥ {formatBalance(quote.otherAmountThreshold, to.decimals, 6)} {to.symbol}
-            </Text>
-            <Text style={styles.requestText}>
-              Price impact {(Number(quote.priceImpactPct) * 100).toFixed(2)}% · Slippage {(quote.slippageBps / 100).toFixed(2)}%
-            </Text>
+            <Text style={styles.requestText}>{outText}</Text>
+            {jupQuote && (
+              <Text style={styles.requestText}>
+                Price impact {(Number(jupQuote.priceImpactPct) * 100).toFixed(2)}%
+              </Text>
+            )}
           </View>
         )}
         <Button
-          label={executing ? 'Swapping…' : `Swap ${from.symbol} → ${to.symbol}`}
+          label={executing ? 'Swapping…' : `Swap ${from?.symbol ?? ''} → ${to?.symbol ?? ''}`}
           onPress={execute}
-          disabled={executing || !quote}
+          disabled={executing || !ready}
         />
         {status ? <Text style={styles.status}>{status}</Text> : null}
       </View>
 
-      {/* paste any SPL mint into the pair */}
+      {/* paste any contract / mint into the pair */}
       <View style={styles.card}>
-        <Text style={styles.section}>Custom token (mint)</Text>
+        <Text style={styles.section}>Custom token ({active.kind === 'evm' ? 'contract' : 'mint'})</Text>
         <TextInput
           autoCapitalize="none"
-          value={customMint}
-          onChangeText={setCustomMint}
-          placeholder="Paste token mint address…"
+          value={customAddr}
+          onChangeText={setCustomAddr}
+          placeholder={active.kind === 'evm' ? 'Paste token contract address…' : 'Paste token mint address…'}
           placeholderTextColor="#78818f"
           style={styles.input}
         />
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <View style={{ flex: 1 }}>
-            <Button label="Set as From" onPress={() => applyCustomMint('from')} secondary disabled={!customMint.trim()} />
+            <Button label="Set as From" onPress={() => applyCustomAddress('from')} secondary disabled={!customAddr.trim()} />
           </View>
           <View style={{ flex: 1 }}>
-            <Button label="Set as To" onPress={() => applyCustomMint('to')} secondary disabled={!customMint.trim()} />
+            <Button label="Set as To" onPress={() => applyCustomAddress('to')} secondary disabled={!customAddr.trim()} />
           </View>
         </View>
       </View>
     </ScrollView>
   );
+}
+
+function evmToChoice(t: EvmSwapToken): TokenChoice {
+  return { address: t.address, symbol: t.symbol, decimals: t.decimals, isNative: t.isNative };
+}
+
+function jupToChoice(t: (typeof SWAP_TOKEN_OPTIONS)[number]): TokenChoice {
+  return { address: t.mint, symbol: t.symbol, decimals: t.decimals, isNative: t.symbol === 'SOL' };
 }
 
 function TokenPicker({
@@ -213,19 +364,18 @@ function TokenPicker({
   onPick,
 }: {
   label: string;
-  token: SwapTokenOption;
-  onPress: () => void;
-  tokens: SwapTokenOption[];
-  onPick: (t: SwapTokenOption) => void;
+  token: TokenChoice;
+  tokens: TokenChoice[];
+  onPick: (t: TokenChoice) => void;
 }) {
   return (
     <View>
       <Text style={styles.status}>{label}</Text>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
+      <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
         {tokens.map(t => {
-          const active = t.mint === token.mint;
+          const active = t.address === token.address;
           return (
-            <Pressable key={t.mint} onPress={() => onPick(t)} style={[styles.chip, active && styles.chipActive]}>
+            <Pressable key={t.address} onPress={() => onPick(t)} style={[styles.chip, active && styles.chipActive]}>
               <Text style={[styles.chipText, active && styles.chipTextActive]}>{t.symbol}</Text>
             </Pressable>
           );

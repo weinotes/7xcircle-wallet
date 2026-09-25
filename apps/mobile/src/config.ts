@@ -25,6 +25,16 @@
 export const WC_PROJECT_ID =
   process.env.EXPO_PUBLIC_WC_PROJECT_ID ?? 'd25074d0f01af6f931e26082b3137aee';
 
+/**
+ * 0x Swap API key for EVM routes. Optional: without it the mobile Swap tab
+ * stays Solana-only (Jupiter is keyless) instead of offering dead quotes.
+ * Forkers embed their own key at build time via EXPO_PUBLIC_ZEROX_API_KEY.
+ */
+import { setZeroExApiKey } from '@7xcircle/chains';
+
+export const ZEROX_API_KEY = process.env.EXPO_PUBLIC_ZEROX_API_KEY ?? '';
+if (ZEROX_API_KEY) setZeroExApiKey(ZEROX_API_KEY);
+
 /** GitHub source of truth for the in-app update check */
 export const UPDATE_REPO = 'weinotes/7xcircle-wallet';
 
