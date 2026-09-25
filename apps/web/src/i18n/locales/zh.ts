@@ -119,6 +119,7 @@ export default {
     loadDataIssue: '部分数据加载失败（{{error}}），已降级显示，可点刷新重试',
     resolvingName: '正在解析域名…',
     unresolvedName: '未找到 {{name}} 的地址——请检查拼写，或直接填写钱包地址',
+    poisoningWarning: '此地址与您曾用过的某个地址首尾相同——但并不相同。请逐字符核对（地址投毒攻击特征）。',
   },
 
   // ── 收款 ──
@@ -368,6 +369,16 @@ export default {
     resetConfirmTitle: '重置钱包？',
     resetConfirmDesc: '这将从本设备删除加密的钱包数据。您需要助记词来恢复。',
     yesReset: '是，全部重置',
+  },
+
+  // ── 跨链总资产 ──
+  portfolio: {
+    allChains: '全部链',
+    title: '总资产',
+    subtitle: '覆盖 {{count}} 条链',
+    assets: '资产 ({{count}})',
+    empty: '尚未加载——点刷新拉取全部链',
+    partialFail: '{{count}} 条链加载失败——结果可能不完整',
   },
 
   // ── 代币授权台账 ──

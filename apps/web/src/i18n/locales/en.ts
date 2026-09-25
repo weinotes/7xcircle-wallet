@@ -119,6 +119,7 @@ export default {
     loadDataIssue: 'Some data failed to load ({{error}}); showing a reduced view — tap refresh to retry',
     resolvingName: 'Resolving name…',
     unresolvedName: 'No address found for {{name}} — check the spelling or send a raw address',
+    poisoningWarning: 'This address matches the start and end of an address you have used before — but it is NOT the same. Verify every character (address-poisoning pattern).',
   },
 
   // ── Receive ──
@@ -368,6 +369,16 @@ export default {
     resetConfirmTitle: 'Reset Wallet?',
     resetConfirmDesc: "This will delete your encrypted vault from this device. You'll need your recovery phrase to restore.",
     yesReset: 'Yes, Reset Everything',
+  },
+
+  // ── Cross-chain portfolio ──
+  portfolio: {
+    allChains: 'All chains',
+    title: 'Total balance',
+    subtitle: 'Across {{count}} chains',
+    assets: 'Assets ({{count}})',
+    empty: 'Nothing loaded yet — pull refresh to price all chains',
+    partialFail: '{{count}} chain(s) failed to load — results may be incomplete',
   },
 
   // ── Token approvals ledger ──

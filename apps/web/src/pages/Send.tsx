@@ -37,9 +37,10 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, ArrowRight, Loader2, CheckCircle2, XCircle, Coins, Wallet, ChevronDown, ListPlus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, CheckCircle2, XCircle, Coins, Wallet, ChevronDown, ListPlus, ShieldAlert } from 'lucide-react';
 import { Button, Input, Modal } from '@7xcircle/ui';
 import { chainRegistry } from '@7xcircle/core';
+import { useTransactionHistory } from '../hooks/useTransactionHistory.js';
 import { useWalletStore } from '../store/wallet.js';
 import {
   CHAIN_CONFIGS,
@@ -59,6 +60,7 @@ import {
   type TronResourceEstimate,
 } from '@7xcircle/chains';
 import { formatBalance } from '@7xcircle/shared';
+import { findLookalikes } from '@7xcircle/shared';
 import type { FeeTier, TokenBalance, TxIntent } from '@7xcircle/shared';
 import { useTxFlow } from '../hooks/useTxFlow.js';
 import { signForAccount } from '../hw/signFor.js';
@@ -194,6 +196,21 @@ export function Send() {
 
   const adapter = chainRegistry.get(activeChainId);
   const activeChain = CHAIN_CONFIGS.find(c => c.chainId === activeChainId);
+
+  // Poisoning guard: past recipients on this chain are the "known shapes" a
+  // forged head+tail address would try to blend into.
+  const { transactions: recipientHistory } = useTransactionHistory(
+    activeChainId,
+    fromAccount?.address,
+  );
+  const lookalikes = useMemo(() => {
+    if (!toAddress || !fromAccount || !adapter?.validateAddress(toAddress)) return [];
+    const known = new Set<string>([fromAccount.address]);
+    for (const tx of recipientHistory) {
+      if (tx.direction === 'sent' && tx.to) known.add(tx.to);
+    }
+    return findLookalikes(toAddress, known);
+  }, [toAddress, fromAccount, adapter, recipientHistory]);
 
   // Build → sign → broadcast → confirm, including Solana blockhash retry
   const flow = useTxFlow({ adapter, account: fromAccount, chainId: activeChainId, feeTier });
@@ -1120,6 +1137,34 @@ export function Send() {
         </div>
       )}
 
+      {/* ── Poisoning guard banner ───────────────────────────────── */}
+      {lookalikes.length > 0 && (
+        <div
+          role="alert"
+          style={{
+            display: 'flex',
+            gap: 'var(--ow-space-2)',
+            alignItems: 'flex-start',
+            padding: 'var(--ow-space-3)',
+            borderRadius: 'var(--ow-radius-md)',
+            backgroundColor: 'var(--ow-error-bg)',
+            border: '1px solid var(--ow-negative)',
+            color: 'var(--ow-negative-fg)',
+            fontSize: 'var(--ow-font-size-sm)',
+          }}
+        >
+          <ShieldAlert size={16} aria-hidden="true" style={{ flexShrink: 0, marginTop: 2 }} />
+          <div>
+            <div style={{ fontWeight: 600 }}>{t('send.poisoningWarning')}</div>
+            {lookalikes.map(known => (
+              <div key={known} className="ow-mono" style={{ fontSize: 'var(--ow-font-size-xs)', wordBreak: 'break-all', marginTop: 2 }}>
+                {known}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── Amount + Max ─────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 'var(--ow-space-2)', alignItems: 'flex-end' }}>
         <div style={{ flex: 1 }}>
@@ -1384,6 +1429,22 @@ export function Send() {
               </div>
             )}
             <code style={{ wordBreak: 'break-all' }}>{toAddress}</code>
+            {lookalikes.length > 0 && (
+              <div
+                role="alert"
+                style={{
+                  display: 'flex',
+                  gap: 6,
+                  alignItems: 'center',
+                  marginTop: 4,
+                  color: 'var(--ow-negative-fg)',
+                  fontSize: 'var(--ow-font-size-xs)',
+                  fontWeight: 600,
+                }}
+              >
+                <ShieldAlert size={13} aria-hidden="true" /> {t('send.poisoningWarning')}
+              </div>
+            )}
           </div>
           <div>
             <strong>{t('send.amount')}</strong> {amount} {sendToken.symbol}
