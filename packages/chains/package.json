@@ -25,7 +25,7 @@
   },
   "dependencies": {
     "@noble/curves": "^1.8.0",
-    "@noble/hashes": "^1.6.0",
+    "@noble/hashes": "^2.4.0",
     "@7xcircle/core": "workspace:*",
     "@7xcircle/shared": "workspace:*",
     "@solana/spl-token": "^0.4.15",
