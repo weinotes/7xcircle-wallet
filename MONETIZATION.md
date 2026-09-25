@@ -4,7 +4,7 @@
 
 **运营性质（2026-09-25 业主确认）：** 个人开源项目——**不做**法币出入金、做市、自营托管等任何需要金融牌照的业务；收入仅限第三方技术分润（Swap 返佣、能量租赁佣金）。与本文 §风险表中“法币出入金：已排除”一致。
 
-**文档版本:** v1.2 · 2026-09-25
+**文档版本:** v1.3 · 2026-09-25
 **适用阶段:** Alpha → 有稳定用户量的 1.0
 
 ---
@@ -249,7 +249,7 @@ TP 用户**本来就懂能量**，这是最容易被理解、最容易推销的�
 | **实时价格** | **Jupiter Price API（Solana）+ DexScreener（全链）** | 待建 |
 | **新币自动发现** | Solana 枚举 SPL token accounts；EVM 用 explorer wildcard `tokenbalance` | 待建 |
 
-> ⚠️ **不要用 CoinGecko 做土狗价格——它覆盖不到。** 这是目前 `apps/web` 里最大的体验缺口：`priceUsd` / `balanceUsd` 字段在 `packages/shared/src/types.ts` 里定义了，但**代码中从未被赋值**。
+> **状态（2026-09-25 更新）：实时价格已落地。** `packages/chains/src/pricing/price.ts` 通过 Jupiter Price API（Solana）+ DexScreener（EVM）拉取土狗价格，`priceUsd` / `balanceUsd` 字段已真正赋值，Home 页按 USD 排序与汇总资产。**CoinGecko 仍不接入**——它覆盖不到土狗，当前数据源是正确的选择。剩余缺口：持仓集中度与 Top 10 持有人占比仍未做，但貔貅检测（GoPlus）+ Solana mint/freeze 权限检查已上线，构成最小可用的安全检测层。
 
 ---
 
@@ -485,4 +485,4 @@ Phase 6 ── 可选
 
 ---
 
-*文档版本：v1.1 · 2026-09-25 · Apache-2.0*
+*文档版本：v1.3 · 2026-09-25 · Apache-2.0*

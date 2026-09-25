@@ -9,9 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Pre-sign transaction simulation: Send page now runs a pre-flight check
+  via `eth_call` (EVM) / `simulateTransaction` (Solana) before the user
+  signs. The confirm modal shows expected token changes and any warnings;
+  a failed simulation disables the confirm button so users cannot waste
+  gas signing a transaction that would revert on-chain.
+- SECURITY.md: vulnerability disclosure policy with email contact,
+  response timeline (48h ack, 5-day triage, 14-day fix for critical),
+  scope definition, and self-audit checklist status.
+- .env.example: full environment variable documentation covering swap
+  fee routing, 0x gateway pattern (key exposure warning), TRON energy
+  sponsor code, Marinade referral code, and WalletConnect project ID.
 - Multi-account HD wallets: `unlock()` derives per-chain account counts
-  (persisted), Home gains an account switcher chip row with “+ Add
-  account”, and every money page resolves its signer through a shared
+  (persisted), Home gains an account switcher chip row with "+ Add
+  account", and every money page resolves its signer through a shared
   `selectActiveAccount` — chain switches re-point it atomically.
 - Extension dApp protocol completed: `wallet_switchEthereumChain` is now
   a user-approval prompt (admin tier) that atomically moves the wallet UI

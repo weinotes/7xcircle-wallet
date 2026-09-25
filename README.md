@@ -86,10 +86,12 @@ check against GitHub Releases.
 
 Build with `pnpm --filter @7xcircle/extension build`, then load
 `apps/extension/dist` as an unpacked extension in Chrome or another Chromium browser.
-The popup supports the wallet UI, and the injected EIP-1193 provider exposes the
-current BNB chain and read-only account discovery while transaction approval UI is
-being completed. The dApp-compatibility targets are MetaMask (EIP-1193 + EIP-6963),
-Phantom (`window.solana`) and TronLink/TokenPocket (`window.tronWeb`).
+The injected EIP-1193 provider announces via EIP-6963 and handles the full approval
+matrix — `eth_requestAccounts`, `personal_sign`, `eth_signTypedData_v4`,
+`eth_sendTransaction` and `wallet_switchEthereumChain` — each gated by the popup's
+per-origin × per-method approval UI. The dApp-compatibility targets are MetaMask
+(EIP-1193 + EIP-6963), Phantom (`window.solana`) and TronLink/TokenPocket
+(`window.tronWeb`).
 
 Requires Node.js >= 20.19 and pnpm >= 9.
 
