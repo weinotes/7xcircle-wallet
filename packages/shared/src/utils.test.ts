@@ -27,7 +27,7 @@
  * than asserting it is correct: it silently truncates over-precise input.
  */
 import { describe, it, expect } from 'vitest';
-import { bytesToBase64, base64ToBytes, parseAmount, formatBalance } from './utils.js';
+import { bytesToBase64, base64ToBytes, parseAmount, formatBalance, formatUsd } from './utils.js';
 
 const utf8 = (s: string) => new TextEncoder().encode(s);
 
@@ -124,5 +124,22 @@ describe('formatBalance', () => {
     // pass an explicit maxFraction, as Send.tsx does for fees (8).
     expect(formatBalance('1', 9)).toBe('0.000000');
     expect(formatBalance('1', 9, 9)).toBe('0.000000001');
+  });
+});
+
+describe('formatUsd', () => {
+  it('renders cents for normal amounts with thousands separators', () => {
+    expect(formatUsd(1234.5)).toBe('$1,234.50');
+    expect(formatUsd(0)).toBe('$0.00');
+  });
+
+  it('keeps precision below a dollar so dust is not shown as zero', () => {
+    expect(formatUsd(0.0004)).toBe('$0.0004');
+    expect(formatUsd(0.5)).toBe('$0.5000');
+  });
+
+  it('falls back to zero for a non-finite input', () => {
+    expect(formatUsd(Number.NaN)).toBe('$0.00');
+    expect(formatUsd(Number.POSITIVE_INFINITY)).toBe('$0.00');
   });
 });

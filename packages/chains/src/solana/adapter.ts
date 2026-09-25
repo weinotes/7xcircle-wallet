@@ -45,6 +45,7 @@ import bs58 from 'bs58';
 
 import {
   base64ToBytes,
+  bytesToBase64,
   formatBalance,
   fromHex,
   parseAmount as parseAmountHelper,
@@ -64,12 +65,20 @@ import type {
 } from '@open-wallet/shared';
 import type { BuildOpts, ChainAdapter } from '@open-wallet/core';
 
+import { parseSolanaTokenSafety, type SolanaTokenSafety } from '../security/solana.js';
 import {
   compileIntent,
   pickPriorityFee,
   COMPUTE_UNIT_LIMIT,
   type CompileContext,
 } from './intent.js';
+import {
+  buildJitoTipInstruction,
+  JITO_TIP_LAMPORTS,
+  paysJitoTip,
+  sendViaJito,
+} from './jito.js';
+import { fetchTokenMetadata } from './jupiter.js';
 
 /** Base fee per signature, in lamports. Solana charges this regardless of size. */
 const SIGNATURE_FEE_LAMPORTS = 5_000n;
@@ -123,25 +132,89 @@ export class SolanaAdapter implements ChainAdapter {
     }
   }
 
+  /**
+   * Every asset the owner holds: native SOL plus every SPL token account.
+   *
+   * Solana needs no indexer for this — token accounts are enumerable from the
+   * RPC in one call, which is exactly why a freshly airdropped memecoin shows
+   * up here the moment it lands.
+   *
+   * Native SOL is included first, mirroring the EVM adapters: callers (the
+   * home screen) look for the entry flagged `isNative` to render the hero
+   * balance, so omitting it would show 0 SOL for a funded wallet.
+   *
+   * Symbols come from Jupiter's token search. That lookup is best-effort —
+   * an unreachable metadata API must never cost the user their balance list,
+   * so on failure the mint is shown truncated instead.
+   */
   async getAllTokenBalances(address: string): Promise<TokenBalance[]> {
+    const native: TokenBalance = {
+      address: 'native',
+      symbol: this.config.nativeSymbol,
+      name: this.config.nativeSymbol,
+      decimals: this.config.nativeDecimals,
+      chainId: this.config.chainId,
+      isNative: true,
+      balance: '0',
+    };
     try {
-      const owner = new PublicKey(address);
-      const accounts = await this.connection.getParsedTokenAccountsByOwner(owner, {
-        programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
-      });
+      native.balance = await this.getNativeBalance(address);
+    } catch {
+      // Keep 0 — the rest of the list is still worth returning
+    }
 
-      return accounts.value.map(acc => ({
-        address: acc.account.data.parsed.info.mint,
-        symbol: '',
-        name: '',
-        decimals: acc.account.data.parsed.info.tokenAmount.decimals,
+    let accounts: Awaited<ReturnType<Connection['getParsedTokenAccountsByOwner']>>;
+    try {
+      accounts = await this.connection.getParsedTokenAccountsByOwner(
+        new PublicKey(address),
+        { programId: TOKEN_PROGRAM_ID },
+      );
+    } catch {
+      return [native];
+    }
+
+    // One mint can be held in several accounts (e.g. after a partial move);
+    // the wallet shows a token, not an account, so balances are summed.
+    const byMint = new Map<string, TokenBalance>();
+
+    for (const account of accounts.value) {
+      const info = account.account.data.parsed.info;
+      const mint: string = info.mint;
+      const existing = byMint.get(mint);
+
+      if (existing) {
+        existing.balance = (BigInt(existing.balance) + BigInt(info.tokenAmount.amount)).toString();
+        continue;
+      }
+
+      byMint.set(mint, {
+        address: mint,
+        // Truncated mint as the symbol: honest until metadata resolves
+        symbol: mint.slice(0, 6),
+        name: 'SPL Token',
+        decimals: info.tokenAmount.decimals,
         chainId: this.config.chainId,
         isNative: false,
-        balance: acc.account.data.parsed.info.tokenAmount.amount,
-      }));
-    } catch {
-      return [];
+        balance: info.tokenAmount.amount,
+      });
     }
+
+    const tokens = [...byMint.values()];
+    if (tokens.length === 0) return [native];
+
+    try {
+      const metadata = await fetchTokenMetadata(tokens.map(token => token.address));
+      for (const token of tokens) {
+        const meta = metadata[token.address];
+        if (!meta) continue;
+        token.symbol = meta.symbol;
+        token.name = meta.name;
+      }
+    } catch {
+      // Metadata API unavailable — truncated mints remain
+    }
+
+    return [native, ...tokens];
   }
 
   /**
@@ -166,6 +239,34 @@ export class SolanaAdapter implements ChainAdapter {
     };
   }
 
+  /**
+   * On-chain safety scan for an SPL mint.
+   *
+   * Reads the two authorities straight off the mint account (no oracle
+   * needed) plus the largest token accounts for holder concentration.
+   *
+   * Throws only if the mint itself cannot be read — Token-2022 mints are not
+   * covered, since they live under a different program. Callers treat a throw
+   * as "no data", never as "safe".
+   */
+  async getTokenSafety(tokenAddress: string): Promise<SolanaTokenSafety> {
+    const mint = new PublicKey(tokenAddress);
+
+    const [mintInfo, largest] = await Promise.all([
+      getMint(this.connection, mint, 'confirmed', TOKEN_PROGRAM_ID),
+      // Concentration is the softest signal here — losing it must not lose
+      // the authority verdicts, so its failure is absorbed.
+      this.connection.getTokenLargestAccounts(mint).catch(() => null),
+    ]);
+
+    return parseSolanaTokenSafety({
+      mintAuthority: mintInfo.mintAuthority?.toBase58() ?? null,
+      freezeAuthority: mintInfo.freezeAuthority?.toBase58() ?? null,
+      supply: mintInfo.supply.toString(),
+      largestAccountAmounts: largest?.value.map(account => account.amount) ?? [],
+    });
+  }
+
   // ─── Transactions ──────────────────────────────────────────────────
 
   /**
@@ -185,6 +286,14 @@ export class SolanaAdapter implements ChainAdapter {
     };
     const ixs = await compileIntent(intent, payer, ctx);
 
+    // The fast tier opts into the Jito relay: a tip transfer rides inside the
+    // SAME transaction, which `sendTransaction` then recognises and routes to
+    // the block engine instead of the public RPC. Mainnet only — Jito has no
+    // relay for a devnet/testnet cluster, where a tip would be pure waste.
+    if (this.shouldUseJito(feeTier)) {
+      ixs.push(buildJitoTipInstruction(payer, JITO_TIP_LAMPORTS.fast));
+    }
+
     const priceMicroLamports = await this.resolvePriorityFee(
       this.collectWritableAccounts(ixs),
       feeTier,
@@ -198,7 +307,7 @@ export class SolanaAdapter implements ChainAdapter {
    * request, an SDK. The payload already has its own blockhash and
    * ComputeBudget instructions, so it is deserialized rather than rebuilt.
    */
-  async importExternalTransaction(tx: ExternalTx, opts: BuildOpts): Promise<UnsignedTx> {
+  async importExternalTransaction(tx: ExternalTx, _opts: BuildOpts): Promise<UnsignedTx> {
     const bytes = tx.encoding === 'base64'
       ? base64ToBytes(tx.payload)
       : fromHex(tx.payload);
@@ -207,7 +316,10 @@ export class SolanaAdapter implements ChainAdapter {
     try {
       decoded = VersionedTransaction.deserialize(bytes);
     } catch (cause) {
-      throw new Error(`Could not deserialize Solana transaction: ${(cause as Error).message}`);
+      throw new Error(
+        `Could not deserialize Solana transaction: ${(cause as Error).message}`,
+        { cause },
+      );
     }
 
     // The builder's own expiry is not carried in the serialized transaction,
@@ -247,6 +359,26 @@ export class SolanaAdapter implements ChainAdapter {
 
   async sendTransaction(signedTx: SignedTransaction): Promise<string> {
     const bytes = fromHex(signedTx.raw as string);
+
+    // A tipped transaction exists to go through the Jito block engine — that
+    // routing is what the tip buys. Detection is by inspection rather than a
+    // flag carried through the sign step, so a transaction built anywhere
+    // (including one imported from a dApp) is routed consistently.
+    //
+    // Failure to reach the relay is NOT fatal: the transaction is already
+    // signed and valid, so the public RPC is a real fallback — the tip then
+    // lands as an ordinary transfer and the send simply loses the priority
+    // routing. Falls through rather than throwing.
+    if (this.shouldUseJito('fast')) {
+      try {
+        const decoded = VersionedTransaction.deserialize(bytes);
+        if (paysJitoTip(decoded)) {
+          return await sendViaJito(bytesToBase64(bytes));
+        }
+      } catch {
+        // Detection or relay failed — fall back to the public RPC below
+      }
+    }
 
     return this.connection.sendRawTransaction(bytes, {
       // Preflight so the user gets a real error instead of a silently
@@ -406,7 +538,7 @@ export class SolanaAdapter implements ChainAdapter {
     const feeTier = opts.feeTier ?? 'normal';
     const cuLimit = BigInt(COMPUTE_UNIT_LIMIT[intent.kind]);
 
-    let priceMicroLamports = 0;
+    let priceMicroLamports: number;
     try {
       const samples = await this.connection.getRecentPrioritizationFees({});
       priceMicroLamports = pickPriorityFee(samples.map(s => s.prioritizationFee), feeTier);
@@ -415,7 +547,11 @@ export class SolanaAdapter implements ChainAdapter {
     }
 
     const priorityFee = (BigInt(priceMicroLamports) * cuLimit) / 1_000_000n;
-    const totalFee = SIGNATURE_FEE_LAMPORTS + priorityFee;
+    // The fee the user is shown must include the Jito tip the fast tier
+    // attaches, otherwise the quoted total is a lie whenever the send is
+    // routed through the block engine.
+    const jitoTip = this.shouldUseJito(feeTier) ? JITO_TIP_LAMPORTS.fast : 0n;
+    const totalFee = SIGNATURE_FEE_LAMPORTS + priorityFee + jitoTip;
 
     return {
       level: feeTier,
@@ -545,6 +681,18 @@ export class SolanaAdapter implements ChainAdapter {
     } catch {
       return pickPriorityFee([], tier);
     }
+  }
+
+  /**
+   * Whether the Jito relay applies to this adapter at all.
+   *
+   * Gated on cluster: the block engine only relays mainnet (and Jito's own
+   * testnet), so a devnet config must never pay a tip for routing it cannot
+   * get. Combined with the tier check this is the single place the decision
+   * lives, shared by build / send / fee estimate so they can never disagree.
+   */
+  private shouldUseJito(tier: FeeTier): boolean {
+    return tier === 'fast' && !this.config.testnet;
   }
 
   /** Collect the writable accounts an instruction set touches */

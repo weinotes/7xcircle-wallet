@@ -35,7 +35,6 @@ import {
   type Address,
   type Hex,
   type PublicClient,
-  type WalletClient,
   type Chain as ViemChain,
   parseUnits,
   formatUnits,
@@ -62,15 +61,15 @@ import type {
   FeeTier,
   SignedTransaction,
   TokenBalance,
-  TokenInfo,
   TransactionRecord,
   TxIntent,
   UnsignedTx,
 } from '@open-wallet/shared';
-import type { BuildOpts, ChainAdapter } from '@open-wallet/core';
+import type { BuildOpts, ChainAdapter, TokenSafetyReport } from '@open-wallet/core';
 import { toEip55Address, validateEip55Address } from './utils.js';
 import { ExplorerClient, type ExplorerNativeTx, type ExplorerTokenTx } from './explorer.js';
 import { compileIntent, decodeUint256, encodeAllowance } from './intent.js';
+import { fetchTokenSafety, type TokenScanChain } from '../security/tokenscan.js';
 
 /**
  * Fee-tier multipliers applied to the priority fee, in basis points.
@@ -88,6 +87,20 @@ const FEE_TIER_BPS: Record<FeeTier, bigint> = {
 /** Global explorer API key — read from env at module load. Optional. */
 const EXPLORER_API_KEY =
   (typeof process !== 'undefined' && process.env?.EXPLORER_API_KEY) || undefined;
+
+/**
+ * Decimal chain ids GoPlus covers, as the scan API keys them. A chain absent
+ * here (testnets, unsupported networks) simply has no safety scan.
+ */
+const SCANNABLE_CHAINS = new Map<number, TokenScanChain>([
+  [1, '1'],
+  [56, '56'],
+  [137, '137'],
+  [42161, '42161'],
+  [10, '10'],
+  [8453, '8453'],
+  [43114, '43114'],
+]);
 
 /** Map our chainId to viem chain object */
 const VIEM_CHAIN_MAP: Record<string, ViemChain> = {
@@ -634,6 +647,21 @@ export class EvmAdapter implements ChainAdapter {
     };
   }
 
+  /**
+   * Advisory token-safety scan via GoPlus (keyless).
+   *
+   * Returns null for a chain GoPlus does not cover and for a token it has no
+   * data on — both mean "no opinion", which the UI must show as unknown
+   * rather than safe.
+   */
+  async getTokenSafety(tokenAddress: string): Promise<TokenSafetyReport | null> {
+    const chain = SCANNABLE_CHAINS.get(this.chainDecimalId);
+    if (!chain || !/^0x[0-9a-fA-F]{40}$/.test(tokenAddress)) return null;
+
+    const safety = await fetchTokenSafety(chain, tokenAddress);
+    return safety ? { warnings: safety.warnings } : null;
+  }
+
   /** Convert a human-readable token amount to raw units using the token's decimals */
   parseTokenAmount(amount: string, decimals: number): string {
     return parseUnits(amount, decimals).toString();
@@ -676,7 +704,6 @@ export function toTransactionRecord(
 ): TransactionRecord {
   const lowerAddr = address.toLowerCase();
   const from = tx.from.toLowerCase();
-  const to = tx.to.toLowerCase();
 
   const record: TransactionRecord = {
     hash: tx.hash,

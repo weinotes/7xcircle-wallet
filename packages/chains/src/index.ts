@@ -18,10 +18,17 @@ export * from './evm/adapter.js';
 export * from './evm/explorer.js';
 export * from './solana/adapter.js';
 export * from './solana/jupiter.js';
+export * from './solana/jito.js';
 export * from './tron/adapter.js';
 export * from './tron/address.js';
+export * from './tron/tronsave.js';
 export * from './staking/solana.js';
+export * from './staking/marinade.js';
+export * from './swap/zerox.js';
 export * from './security/tokenscan.js';
+export * from './security/solana.js';
+export * from './pricing/price.js';
+export * from './yield/lifi.js';
 
 import { chainRegistry } from '@open-wallet/core';
 import { EvmAdapter } from './evm/adapter.js';

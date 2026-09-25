@@ -23,9 +23,12 @@ import { describe, it, expect } from 'vitest';
 import {
   buildQuoteUrl,
   buildSwapBody,
+  buildTokenSearchUrl,
   deriveFeeAccount,
+  isBase58Address,
   parseQuote,
   parseSwapResponse,
+  parseTokenSearch,
   SOL_MINT,
   USDC_MINT,
 } from './jupiter.js';
@@ -140,5 +143,66 @@ describe('deriveFeeAccount', () => {
     expect(solAta).not.toBe(usdcAta);
     // re-derivation is stable (fee destination must never drift per mint)
     expect(await deriveFeeAccount(FEE_WALLET, SOL_MINT)).toBe(solAta);
+  });
+});
+
+describe('buildTokenSearchUrl', () => {
+  it('joins mints into the query parameter', () => {
+    expect(buildTokenSearchUrl([SOL_MINT, USDC_MINT], 'https://x/tokens'))
+      .toBe(`https://x/tokens?query=${SOL_MINT},${USDC_MINT}`);
+  });
+
+  it('rejects an empty list and an oversized batch', () => {
+    expect(() => buildTokenSearchUrl([])).toThrow(/at least one/);
+    expect(() => buildTokenSearchUrl(Array(51).fill(SOL_MINT))).toThrow(/at most 50/);
+  });
+});
+
+describe('parseTokenSearch', () => {
+  it('maps the array payload to mint-keyed metadata', () => {
+    expect(parseTokenSearch([
+      { id: USDC_MINT, symbol: 'USDC', name: 'USD Coin', decimals: 6 },
+    ])).toEqual({
+      [USDC_MINT]: { mint: USDC_MINT, symbol: 'USDC', name: 'USD Coin', decimals: 6 },
+    });
+  });
+
+  it('falls back to the symbol as name and 9 decimals', () => {
+    const parsed = parseTokenSearch([{ id: SOL_MINT, symbol: 'MEME' }]);
+    expect(parsed[SOL_MINT]).toEqual({ mint: SOL_MINT, symbol: 'MEME', name: 'MEME', decimals: 9 });
+  });
+
+  it('drops entries without an id or symbol rather than half-filling them', () => {
+    expect(parseTokenSearch([
+      { symbol: 'NOID' },
+      { id: SOL_MINT, symbol: '' },
+      { id: USDC_MINT, symbol: 'USDC' },
+    ])).toEqual({
+      [USDC_MINT]: { mint: USDC_MINT, symbol: 'USDC', name: 'USDC', decimals: 9 },
+    });
+  });
+
+  it('returns nothing for a non-array payload', () => {
+    expect(parseTokenSearch({ error: 'nope' })).toEqual({});
+    expect(parseTokenSearch(null)).toEqual({});
+  });
+});
+
+describe('isBase58Address', () => {
+  it('accepts real Solana pubkeys', () => {
+    expect(isBase58Address(USDC_MINT)).toBe(true);
+    expect(isBase58Address('BGUGhvBhkxxq48g3SrpsATQdo48xcaGLSKmNDEpgJpwG')).toBe(true);
+  });
+
+  it('rejects an EVM address — the mistake that breaks every swap', () => {
+    // Left unvalidated, a 0x address in VITE_SWAP_FEE_WALLET reaches
+    // deriveFeeAccount and throws inside the swap path.
+    expect(isBase58Address('0x365d75193011806f6a896d069e4370c87cf89d14')).toBe(false);
+  });
+
+  it('rejects empty, short and non-base58 values', () => {
+    expect(isBase58Address('')).toBe(false);
+    expect(isBase58Address('abc')).toBe(false);
+    expect(isBase58Address('hello world')).toBe(false);
   });
 });

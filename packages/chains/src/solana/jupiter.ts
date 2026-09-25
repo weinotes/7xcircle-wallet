@@ -204,6 +204,79 @@ export async function fetchSwapTransaction(params: SwapBuildParams): Promise<str
   return parseSwapResponse(await res.json());
 }
 
+// ─── Token metadata ─────────────────────────────────────────────────
+
+const TOKEN_SEARCH_BASE = 'https://lite-api.jup.ag/tokens/v2/search';
+/** Jupiter accepts up to 50 mints per search request */
+const TOKEN_SEARCH_CHUNK = 50;
+
+export interface TokenMetadata {
+  mint: string;
+  symbol: string;
+  name: string;
+  decimals: number;
+}
+
+export function buildTokenSearchUrl(mints: string[], base = TOKEN_SEARCH_BASE): string {
+  if (mints.length === 0) throw new Error('token search needs at least one mint');
+  if (mints.length > TOKEN_SEARCH_CHUNK) {
+    throw new Error(`token search accepts at most ${TOKEN_SEARCH_CHUNK} mints per request`);
+  }
+  return `${base}?query=${mints.join(',')}`;
+}
+
+/**
+ * Narrow the search payload to a mint → metadata map.
+ *
+ * An SPL mint carries no symbol of its own, so without this a freshly
+ * discovered token shows as a truncated address. Entries missing an id or a
+ * symbol are dropped rather than half-filled — a blank symbol is honest,
+ * a wrong one is not.
+ */
+export function parseTokenSearch(json: unknown): Record<string, TokenMetadata> {
+  if (!Array.isArray(json)) return {};
+
+  // The feed keys tokens by `id`; our own shape uses `mint` throughout.
+  const entries = json as Array<{
+    id?: unknown;
+    symbol?: unknown;
+    name?: unknown;
+    decimals?: unknown;
+  }>;
+
+  const out: Record<string, TokenMetadata> = {};
+  for (const entry of entries) {
+    if (typeof entry?.id !== 'string' || typeof entry.symbol !== 'string' || entry.symbol.length === 0) {
+      continue;
+    }
+    out[entry.id] = {
+      mint: entry.id,
+      symbol: entry.symbol,
+      name: typeof entry.name === 'string' && entry.name.length > 0 ? entry.name : entry.symbol,
+      decimals: typeof entry.decimals === 'number' ? entry.decimals : 9,
+    };
+  }
+  return out;
+}
+
+/**
+ * Resolve SPL metadata for a batch of mints. Throws on transport failure so
+ * callers can degrade (a balance list must still render without symbols).
+ */
+export async function fetchTokenMetadata(mints: string[]): Promise<Record<string, TokenMetadata>> {
+  const unique = [...new Set(mints)];
+  const out: Record<string, TokenMetadata> = {};
+
+  for (let i = 0; i < unique.length; i += TOKEN_SEARCH_CHUNK) {
+    const batch = unique.slice(i, i + TOKEN_SEARCH_CHUNK);
+    const res = await fetch(buildTokenSearchUrl(batch), { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error(`jupiter token search HTTP ${res.status}`);
+    Object.assign(out, parseTokenSearch(await res.json()));
+  }
+
+  return out;
+}
+
 // ─── Fee routing ────────────────────────────────────────────────────
 
 /**
@@ -231,7 +304,14 @@ function assertBase58Address(value: string, label: string): void {
   }
 }
 
-function isBase58Address(value: string): boolean {
+/**
+ * True when `value` is a well-formed base58-encoded 32-byte Solana pubkey.
+ *
+ * Exported so a caller can validate a CONFIGURED address up front: an invalid
+ * fee wallet would otherwise only surface inside `deriveFeeAccount`, where
+ * `new PublicKey()` throws and takes the whole swap down with it.
+ */
+export function isBase58Address(value: string): boolean {
   try {
     new PublicKey(value);
     return true;

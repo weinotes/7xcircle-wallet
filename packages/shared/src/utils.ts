@@ -56,6 +56,23 @@ export function parseAmount(amount: string, decimals: number): string {
   return (int + paddedFrac).replace(/^0+(?=\d)/, '') || '0';
 }
 
+/**
+ * Format a USD amount for display.
+ *
+ * Small non-zero values keep more precision than cents — a memecoin position
+ * worth $0.0004 rounding to "$0.00" reads as worthless, which is the one
+ * outcome a wallet must never imply. Zero stays a plain "$0.00".
+ */
+export function formatUsd(value: number): string {
+  if (!Number.isFinite(value)) return '$0.00';
+  const abs = Math.abs(value);
+  const digits = abs === 0 ? 2 : abs < 1 ? 4 : 2;
+  return `$${value.toLocaleString('en-US', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })}`;
+}
+
 /** Simple UUID v4 for account IDs */
 export function generateId(): string {
   const bytes = new Uint8Array(16);

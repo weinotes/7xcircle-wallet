@@ -83,6 +83,47 @@ function addressHex(address: string): string {
 const ZERO_OWNER_HEX = '41' + '00'.repeat(20);
 
 /**
+ * Energy a TRC20 transfer consumes when the node cannot simulate it.
+ *
+ * Measured on mainnet (2026-09): ~31.9k-64.3k to an existing recipient, ~65.5k
+ * to a fresh one. The worst case is the honest fallback — an estimate that is
+ * too low makes a user under-fund a transfer that then fails.
+ */
+const DEFAULT_TRC20_ENERGY = 65_527n;
+
+/** Result of /wallet/getaccountresource (staked + free allowances) */
+interface AccountResourceResponse {
+  EnergyLimit?: number;
+  EnergyUsed?: number;
+  NetLimit?: number;
+  NetUsed?: number;
+  freeNetLimit?: number;
+  freeNetUsed?: number;
+}
+
+/**
+ * What an intent costs in Tron's resource model, and what the account already
+ * has staked. Everything is raw units; SUN conversion happens in the caller so
+ * the UI can price the shortfall without a second RPC round trip.
+ */
+export interface TronResourceEstimate {
+  /** energy the call is expected to consume */
+  energyUsed: number;
+  /** staked energy available right now */
+  energyAvailable: number;
+  /** uncovered energy — this is what renting would remove */
+  energyShortfall: number;
+  /** bytes of bandwidth the signed transaction needs */
+  bandwidthUsed: number;
+  /** staked + free bandwidth available right now */
+  bandwidthAvailable: number;
+  /** TRX (in SUN) that would be burned for the uncovered part */
+  burnSun: string;
+  energyPriceSun: string;
+  bandwidthPriceSun: string;
+}
+
+/**
  * Known-good TRC20 contracts for the default asset view, keyed by chain id.
  * Full token discovery needs a TronGrid API key (see setGridApiKey); until
  * then we still surface the token degens actually hold: USDT on mainnet.
@@ -403,8 +444,9 @@ export class TronAdapter implements ChainAdapter {
 
     // Bandwidth = raw tx size + signature, 1 SUN/byte when unstaked
     const bandwidth = BigInt(rawData.length + 65);
-    // Energy: TRC20 transfer ~13.3k (deterministic), native transfer needs none.
-    const energy = intent.kind === 'native-transfer' ? 0n : 15_000n;
+    // Energy: TRC20 transfer is deterministic but chain-parameter dependent
+    // (~32k-65k measured on mainnet, 2026-09); native transfer needs none.
+    const energy = intent.kind === 'native-transfer' ? 0n : DEFAULT_TRC20_ENERGY;
     const totalFee = energy * prices.energySun + bandwidth * prices.bandwidthSun;
 
     return {
@@ -491,7 +533,101 @@ export class TronAdapter implements ChainAdapter {
     return header.number;
   }
 
+  // ─── Resource model (energy / bandwidth) ───────────────────────────
+
+  /** Staked + free allowances currently available to an account. */
+  async getAccountResources(address: string): Promise<{ energyAvailable: number; bandwidthAvailable: number }> {
+    const res = await this.rpc<AccountResourceResponse>('/wallet/getaccountresource', {
+      address,
+      visible: true,
+    });
+    const energyAvailable = Math.max(0, Number(res.EnergyLimit ?? 0) - Number(res.EnergyUsed ?? 0));
+    const netStaked = Math.max(0, Number(res.NetLimit ?? 0) - Number(res.NetUsed ?? 0));
+    const netFree = Math.max(0, Number(res.freeNetLimit ?? 0) - Number(res.freeNetUsed ?? 0));
+    return { energyAvailable, bandwidthAvailable: netStaked + netFree };
+  }
+
+  /**
+   * What an intent will cost in resources, and what is already staked.
+   *
+   * This is the input to the energy-rental offer: when `energyShortfall` is
+   * large enough to buy a lot (see planResourcePurchase in ./tronsave.ts),
+   * renting is cheaper than burning the TRX. The estimate itself never throws —
+   * a node that cannot simulate falls back to the measured worst case.
+   */
+  async estimateResources(intent: TxIntent, opts: BuildOpts): Promise<TronResourceEstimate> {
+    const [resources, prices, unsigned] = await Promise.all([
+      this.getAccountResources(opts.from).catch(() => ({ energyAvailable: 0, bandwidthAvailable: 0 })),
+      this.getResourcePrices(),
+      this.buildTransaction(intent, opts),
+    ]);
+
+    if (unsigned.chainType !== 'tron') {
+      throw new Error(`TronAdapter built a ${unsigned.chainType} transaction`);
+    }
+
+    const simulated = await this.estimateEnergyUsed(intent, opts.from).catch(() => null);
+    const energyUsed = simulated ?? Number(intent.kind === 'native-transfer' ? 0n : DEFAULT_TRC20_ENERGY);
+    // raw_data bytes + a 65-byte signature, charged at 1 SUN/byte when unstaked
+    const bandwidthUsed = unsigned.rawDataHex.length / 2 + 65;
+
+    const energyShortfall = Math.max(0, energyUsed - resources.energyAvailable);
+    const bandwidthShortfall = Math.max(0, bandwidthUsed - resources.bandwidthAvailable);
+    const burnSun = (
+      BigInt(energyShortfall) * prices.energySun + BigInt(bandwidthShortfall) * prices.bandwidthSun
+    ).toString();
+
+    return {
+      energyUsed,
+      energyAvailable: resources.energyAvailable,
+      energyShortfall,
+      bandwidthUsed,
+      bandwidthAvailable: resources.bandwidthAvailable,
+      burnSun,
+      energyPriceSun: String(prices.energySun),
+      bandwidthPriceSun: String(prices.bandwidthSun),
+    };
+  }
+
   // ─── Internals ──────────────────────────────────────────────────────
+
+  /**
+   * Ask the node what an erc20-shaped call would cost in energy, simulating
+   * as THIS owner (the account's own staked energy changes the result).
+   * Returns null when the call is not simulatable — never a guess.
+   */
+  private async estimateEnergyUsed(
+    intent: TxIntent,
+    owner: string,
+  ): Promise<number | null> {
+    // native-transfer burns no energy; arbitrary contract-call calldata has no
+    // text selector to hand triggerconstantcontract
+    if (intent.kind !== 'token-transfer' && intent.kind !== 'approve') return null;
+
+    const isTransfer = intent.kind === 'token-transfer';
+    const data = strip0x(
+      isTransfer
+        ? encodeFunctionData({
+            abi: erc20Abi,
+            functionName: 'transfer',
+            args: [tronToEvmAddress(intent.to) as Address, BigInt(intent.amountRaw)],
+          })
+        : encodeFunctionData({
+            abi: erc20Abi,
+            functionName: 'approve',
+            args: [tronToEvmAddress(intent.spender) as Address, BigInt(intent.amountRaw)],
+          }),
+    );
+
+    const res = await this.rpc<ConstantCallResult>('/wallet/triggerconstantcontract', {
+      owner_address: addressHex(owner),
+      contract_address: addressHex(intent.token),
+      function_selector: isTransfer ? 'transfer(address,uint256)' : 'approve(address,uint256)',
+      parameter: data.slice(8),
+      visible: false,
+    });
+    return typeof res.energy_used === 'number' ? res.energy_used : null;
+  }
 
   /** Pure erc20 read via triggerconstantcontract; returns '0x…' result hex.
    *  The API wants the TEXT signature (it derives the selector itself) and

@@ -30,7 +30,6 @@ import {
   type VaultData,
   fromHex,
   toHex,
-  wipeBytes,
 } from '@open-wallet/shared';
 
 /** Convert string to UTF-8 bytes */

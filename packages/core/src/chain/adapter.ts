@@ -24,7 +24,6 @@
  */
 
 import type {
-  Account,
   ChainConfig,
   ExternalTx,
   FeeEstimate,
@@ -46,6 +45,19 @@ export interface BuildOpts {
   from: string;
   /** Fee speed tier — maps to each chain's own acceleration strategy */
   feeTier?: FeeTier;
+}
+
+/**
+ * Advisory token-safety findings for one asset.
+ *
+ * Only `warnings` is part of the contract: chains report different things
+ * (EVM: honeypot, transfer tax; Solana: mint authority, holder concentration)
+ * and the UI must render all of them the same way. An EMPTY list means "every
+ * check we run passed" — never "we could not check", which is `null`.
+ */
+export interface TokenSafetyReport {
+  /** Human-readable risk strings; empty = all clear */
+  warnings: string[];
 }
 
 export interface ChainAdapter {
@@ -160,6 +172,20 @@ export interface ChainAdapter {
 
   /** Read token metadata from the contract / mint */
   getTokenInfo(token: string): Promise<TokenInfo>;
+
+  /**
+   * Advisory token-safety scan (honeypot, live mint authority, holder
+   * concentration, …).
+   *
+   * OPTIONAL — a chain with no oracle omits the method, and the UI must then
+   * show "no data" rather than "safe". Implementations return `null` when the
+   * oracle has no opinion about this token (unlisted, rate-limited), which is
+   * also NOT the same as a clean report.
+   *
+   * Findings never hard-block a transaction: false positives exist, so the
+   * contract is "loud and skimmable", not "prevented".
+   */
+  getTokenSafety?(token: string): Promise<TokenSafetyReport | null>;
 
   /**
    * Current chain height. Used to detect blockhash expiry on Solana;
