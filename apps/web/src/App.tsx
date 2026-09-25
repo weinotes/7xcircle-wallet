@@ -32,14 +32,17 @@ import { LedgerConnect } from './pages/LedgerConnect.js';
 import { useWalletStore } from './store/wallet.js';
 import { useThemeSync } from './hooks/useThemeSync.js';
 import { registerAllChains } from '@7xcircle/chains';
-import { touchActivity } from '@7xcircle/core';
+import { touchActivity, getSessionState } from '@7xcircle/core';
 
 // Register chain adapters once at app startup
 registerAllChains();
 
-/** Auto-lock after 5 minutes of visibility loss */
+/** Auto-lock after 5 minutes of inactivity (regardless of visibility) */
 const AUTO_LOCK_MS = 5 * 60 * 1000;
+/** How often to check for inactivity while the page is visible */
+const INACTIVITY_CHECK_MS = 30 * 1000;
 let lockTimer: ReturnType<typeof setTimeout> | null = null;
+let inactivityInterval: ReturnType<typeof setInterval> | null = null;
 
 function App() {
   const vaultExists = useWalletStore(s => s.vaultExists);
@@ -56,34 +59,25 @@ function App() {
     syncDocumentDirection(language);
   }, [language]);
 
-  // ── Auto-lock when user leaves the page ──
+  // ── Auto-lock: visibility-based + inactivity-based ──
   useEffect(() => {
     if (!vaultExists) return;
 
     const scheduleLock = () => {
       if (lockTimer) clearTimeout(lockTimer);
       lockTimer = setTimeout(() => {
-        const now = Date.now();
-        const last = useWalletStore.getState();
-        // Only lock if not visible for AUTO_LOCK_MS
         if (document.visibilityState === 'hidden') {
           lock();
         }
-        void now; void last; // silence unused vars
       }, AUTO_LOCK_MS);
     };
 
-    const handleHide = () => {
-      // Immediate-ish: schedule lock timer
-      scheduleLock();
-    };
-
+    const handleHide = () => scheduleLock();
     const handleShow = () => {
       if (lockTimer) {
         clearTimeout(lockTimer);
         lockTimer = null;
       }
-      // Touch session on resume
       if (useWalletStore.getState().unlocked) {
         touchActivity();
       }
@@ -94,8 +88,21 @@ function App() {
       else handleShow();
     });
 
+    // SECURITY: The visibility-based lock above only fires when the user
+    // switches away. A user who walks away with the tab still visible would
+    // leave the wallet unlocked forever. This interval checks lastActivityAt
+    // every 30 s and locks if no interaction happened within AUTO_LOCK_MS.
+    inactivityInterval = setInterval(() => {
+      if (!useWalletStore.getState().unlocked) return;
+      const { lastActivityAt } = getSessionState();
+      if (lastActivityAt && Date.now() - lastActivityAt > AUTO_LOCK_MS) {
+        lock();
+      }
+    }, INACTIVITY_CHECK_MS);
+
     return () => {
       if (lockTimer) clearTimeout(lockTimer);
+      if (inactivityInterval) clearInterval(inactivityInterval);
     };
   }, [vaultExists, lock]);
 

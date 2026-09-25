@@ -27,7 +27,10 @@
   if (window.__7xcircleInjected) return;
   window.__7xcircleInjected = true;
 
-  var nextId = 1;
+  // SECURITY: Use cryptographically random IDs to prevent page scripts from
+  // forging responses. Predictable numeric IDs (nextId++) let any script on
+  // the same page post a fake `source: '7xcircle-content'` message and
+  // inject attacker-controlled results (e.g. fake eth_accounts).
   var pending = {};
   var listeners = {};
   var connectedAccounts = [];
@@ -43,7 +46,8 @@
     if (!args || typeof args.method !== 'string') {
       return Promise.reject(new Error('provider.request({method}) requires a method'));
     }
-    var id = nextId++;
+    var id = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+      .map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
     return new Promise(function (resolve, reject) {
       pending[id] = { resolve: resolve, reject: reject };
       window.postMessage(

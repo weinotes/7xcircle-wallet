@@ -393,6 +393,13 @@ export async function revealRecoveryPhrase(
   vault: VaultData,
   password: string,
 ): Promise<string> {
+  // SECURITY: decryptVault returns the vault plaintext as a JS string that
+  // holds the master mnemonic. JS strings are immutable and cannot be wiped —
+  // the plaintext persists on the heap until GC. This is a fundamental
+  // limitation of the JS runtime. Callers MUST display the phrase briefly,
+  // avoid logging it, and let the string become unreachable as soon as
+  // possible. A full mitigation requires rewriting the vault layer to use
+  // Uint8Array throughout (tracked as a future enhancement).
   const secret = decodeVaultSecret(await decryptVault(vault, password));
   if (secret.kind !== 'mnemonic') {
     throw new Error('This wallet was imported from private keys — it has no recovery phrase');
@@ -416,25 +423,32 @@ export async function exportAccountPrivateKey(
   }
   const secret = decodeVaultSecret(await decryptVault(vault, password));
 
-  let bytes: Uint8Array;
-  if (secret.kind === 'keys') {
-    const family = familyForConfigType(config.type);
-    const matches = secret.keys.filter(k => k.family === family);
-    const entry = matches[account.source === 'key' ? account.accountIndex : 0] ?? matches[0];
-    if (!entry) {
-      throw new Error(`No imported key covers ${account.chainId}`);
+  let bytes: Uint8Array | null = null;
+  try {
+    if (secret.kind === 'keys') {
+      const family = familyForConfigType(config.type);
+      const matches = secret.keys.filter(k => k.family === family);
+      const entry = matches[account.source === 'key' ? account.accountIndex : 0] ?? matches[0];
+      if (!entry) {
+        throw new Error(`No imported key covers ${account.chainId}`);
+      }
+      bytes = parsePrivateKey(entry.family, entry.privateKey).privateKey;
+    } else {
+      bytes = config.type === 'solana'
+        ? deriveSolanaPrivateKey(secret.mnemonic, account.derivationPath)
+        : deriveEvmPrivateKey(secret.mnemonic, account.derivationPath);
     }
-    bytes = parsePrivateKey(entry.family, entry.privateKey).privateKey;
-  } else {
-    bytes = config.type === 'solana'
-      ? deriveSolanaPrivateKey(secret.mnemonic, account.derivationPath)
-      : deriveEvmPrivateKey(secret.mnemonic, account.derivationPath);
-  }
 
-  if (config.type === 'solana') {
-    // Solana wallets (Phantom/Solflare) export the base58 64-byte secret
-    const { base58Encode } = await import('../keys/keyImport.js');
-    return base58Encode(bytes);
+    if (config.type === 'solana') {
+      // Solana wallets (Phantom/Solflare) export the base58 64-byte secret
+      const { base58Encode } = await import('../keys/keyImport.js');
+      return base58Encode(bytes);
+    }
+    return '0x' + toHex(bytes);
+  } finally {
+    // SECURITY: wipe the intermediate key bytes immediately after formatting.
+    // The returned string cannot be wiped (JS strings are immutable), but
+    // the Uint8Array copy can and must be cleared.
+    if (bytes) wipeBytes(bytes);
   }
-  return '0x' + toHex(bytes);
 }

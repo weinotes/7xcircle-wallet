@@ -412,44 +412,66 @@ export class EvmAdapter implements ChainAdapter {
       throw new Error(`EvmAdapter cannot sign a ${tx.chainType} transaction`);
     }
 
-    const pkHex = '0x' + Array.from(privateKey)
-      .map(b => b.toString(16).padStart(2, '0')).join('') as Hex;
+    // SECURITY: The private key is converted to a hex string for viem's
+    // `privateKeyToAccount`. JS strings are immutable and cannot be wiped,
+    // so the hex representation persists on the heap until GC reclaims it.
+    // We minimise the exposure window by nulling all references immediately
+    // after signing. A full fix requires replacing viem's account-based
+    // signing with @noble/curves secp256k1.sign() + manual RLP encoding,
+    // which is tracked as a future enhancement.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let account: any = null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let walletClient: any = null;
+    let signature: string | undefined;
 
-    const account = privateKeyToAccount(pkHex);
-    // Reuse the same fallback transport pattern as publicClient
-    const transports = this.rpcs.map(url =>
-      http(url, { timeout: 8_000, retryCount: 1, retryDelay: 200 }),
-    );
-    const walletClient = createWalletClient({
-      account,
-      chain: this.chain,
-      transport: fallback(transports, { rank: false }),
-    });
+    try {
+      const pkHex = ('0x' + Array.from(privateKey)
+        .map(b => b.toString(16).padStart(2, '0')).join('')) as Hex;
+      account = privateKeyToAccount(pkHex);
 
-    const supports1559 = await this.detectEip1559();
+      const transports = this.rpcs.map(url =>
+        http(url, { timeout: 8_000, retryCount: 1, retryDelay: 200 }),
+      );
+      walletClient = createWalletClient({
+        account,
+        chain: this.chain,
+        transport: fallback(transports, { rank: false }),
+      });
 
-    // Build gas fields — NEVER mix 1559 fields with legacy gasPrice
-    const gasFields = supports1559
-      ? {
-          maxFeePerGas: tx.maxFeePerGas ? BigInt(tx.maxFeePerGas) : undefined,
-          maxPriorityFeePerGas: tx.maxPriorityFeePerGas
-            ? BigInt(tx.maxPriorityFeePerGas)
-            : undefined,
-        }
-      : {
-          gasPrice: tx.gasPrice ? BigInt(tx.gasPrice) : undefined,
-        };
+      const supports1559 = await this.detectEip1559();
 
-    const signature = await walletClient.signTransaction({
-      to: tx.to as Address,
-      value: tx.value ? BigInt(tx.value) : undefined,
-      data: tx.data as Hex | undefined,
-      nonce: tx.nonce,
-      gas: tx.gasLimit ? BigInt(tx.gasLimit) : undefined,
-      chainId: this.chainDecimalId,
-      ...gasFields,
-    });
+      // Build gas fields — NEVER mix 1559 fields with legacy gasPrice
+      const gasFields = supports1559
+        ? {
+            maxFeePerGas: tx.maxFeePerGas ? BigInt(tx.maxFeePerGas) : undefined,
+            maxPriorityFeePerGas: tx.maxPriorityFeePerGas
+              ? BigInt(tx.maxPriorityFeePerGas)
+              : undefined,
+          }
+        : {
+            gasPrice: tx.gasPrice ? BigInt(tx.gasPrice) : undefined,
+          };
 
+      signature = await walletClient.signTransaction({
+        to: tx.to as Address,
+        value: tx.value ? BigInt(tx.value) : undefined,
+        data: tx.data as Hex | undefined,
+        nonce: tx.nonce,
+        gas: tx.gasLimit ? BigInt(tx.gasLimit) : undefined,
+        chainId: this.chainDecimalId,
+        ...gasFields,
+      });
+    } finally {
+      // Drop references as soon as signing is done — shortens the window
+      // during which the key material is reachable from the JS heap.
+      account = null;
+      walletClient = null;
+    }
+
+    if (!signature) {
+      throw new Error('EVM signing produced no signature');
+    }
     return { raw: signature, signature };
   }
 

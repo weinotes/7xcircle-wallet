@@ -345,17 +345,30 @@ export class SolanaAdapter implements ChainAdapter {
       throw new Error(`SolanaAdapter cannot sign a ${tx.chainType} transaction`);
     }
 
-    // Solana uses ed25519 — privateKey is the 32-byte seed from SLIP-0010
-    const keypair = Keypair.fromSeed(privateKey);
-    const decoded = VersionedTransaction.deserialize(fromHex(tx.serialized));
-    decoded.sign([keypair]);
+    // SECURITY: Keypair.fromSeed creates a 64-byte secret (seed + public key)
+    // that persists until GC. We null the reference immediately after signing
+    // to minimise the exposure window. A full fix requires replacing
+    // Keypair.fromSeed with @noble/curves ed25519.sign() + manual signature
+    // injection via decoded.addSignature(), which avoids creating a Keypair
+    // altogether.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let keypair: any = null;
+    let sigBytes: Uint8Array | undefined;
 
-    const sigBytes = decoded.signatures[0];
-    if (!sigBytes) throw new Error('Signing produced no signature');
+    try {
+      keypair = Keypair.fromSeed(privateKey);
+      const decoded = VersionedTransaction.deserialize(fromHex(tx.serialized));
+      decoded.sign([keypair]);
 
-    // `raw` must carry the SIGNED bytes — serializing `tx.serialized` here
-    // would broadcast an unsigned transaction, which the cluster rejects.
-    return { raw: toHex(decoded.serialize()), signature: bs58.encode(sigBytes) };
+      sigBytes = decoded.signatures[0];
+      if (!sigBytes) throw new Error('Signing produced no signature');
+
+      // `raw` must carry the SIGNED bytes — serializing `tx.serialized` here
+      // would broadcast an unsigned transaction, which the cluster rejects.
+      return { raw: toHex(decoded.serialize()), signature: bs58.encode(sigBytes) };
+    } finally {
+      keypair = null;
+    }
   }
 
   async sendTransaction(signedTx: SignedTransaction): Promise<string> {

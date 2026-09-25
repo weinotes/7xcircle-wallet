@@ -42,14 +42,16 @@ import { LedgerConnect } from '@web/pages/LedgerConnect.js';
 import { useWalletStore } from '@web/store/wallet.js';
 import { useThemeSync } from '@web/hooks/useThemeSync.js';
 import { registerAllChains } from '@7xcircle/chains';
-import { touchActivity } from '@7xcircle/core';
+import { touchActivity, getSessionState } from '@7xcircle/core';
 
 // Register chain adapters once at app startup
 registerAllChains();
 
-/** Auto-lock after 5 minutes of visibility loss */
+/** Auto-lock after 5 minutes of inactivity (regardless of visibility) */
 const AUTO_LOCK_MS = 5 * 60 * 1000;
+const INACTIVITY_CHECK_MS = 30 * 1000;
 let lockTimer: ReturnType<typeof setTimeout> | null = null;
+let inactivityInterval: ReturnType<typeof setInterval> | null = null;
 
 function AppShell() {
   const vaultExists = useWalletStore(s => s.vaultExists);
@@ -66,7 +68,7 @@ function AppShell() {
     syncDocumentDirection(language);
   }, [language]);
 
-  // ── Auto-lock when the popup is hidden ──
+  // ── Auto-lock: visibility-based + inactivity-based ──
   useEffect(() => {
     if (!vaultExists) return;
 
@@ -95,8 +97,18 @@ function AppShell() {
       else handleShow();
     });
 
+    // SECURITY: Lock even when the popup stays visible but idle.
+    inactivityInterval = setInterval(() => {
+      if (!useWalletStore.getState().unlocked) return;
+      const { lastActivityAt } = getSessionState();
+      if (lastActivityAt && Date.now() - lastActivityAt > AUTO_LOCK_MS) {
+        lock();
+      }
+    }, INACTIVITY_CHECK_MS);
+
     return () => {
       if (lockTimer) clearTimeout(lockTimer);
+      if (inactivityInterval) clearInterval(inactivityInterval);
     };
   }, [vaultExists, lock]);
 

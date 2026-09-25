@@ -99,6 +99,11 @@ const METHOD_TIERS: Record<string, MethodTier> = {
   wallet_switchEthereumChain: 'admin',
   wallet_addEthereumChain: 'admin',
   wallet_revokePermissions: 'admin',
+  // SECURITY: eth_sign is a legacy method that signs an arbitrary 32-byte
+  // hash. This is a blank cheque — it can sign a transaction hash, a message,
+  // or any other payload the caller chooses. Explicitly unsupported so that
+  // no future change accidentally enables it without a deliberate review.
+  eth_sign: 'unsupported',
 };
 
 export function classifyMethod(method: string): MethodTier {
