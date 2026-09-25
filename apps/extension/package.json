@@ -8,13 +8,13 @@
     "dev": "vite build --watch",
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
     "clean": "rm -rf dist"
   },
   "dependencies": {
     "@open-wallet/chains": "workspace:*",
     "@open-wallet/core": "workspace:*",
     "@open-wallet/shared": "workspace:*",
-    "@open-wallet/storage": "workspace:*",
     "@open-wallet/ui": "workspace:*",
     "buffer": "^6.0.3",
     "i18next": "^26.4.0",
