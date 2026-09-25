@@ -101,6 +101,8 @@ export default {
     earn: 'Earn',
     receive: 'Receive',
     history: 'History',
+    watch: 'Watch',
+    viewChart: 'Price chart',
     dappRequests: 'dApp requests',
     lock: 'Lock',
     sent: 'Sent',
@@ -130,6 +132,32 @@ export default {
     noAccountHint: 'Unlock the wallet and switch to a chain where you hold an account, then return here.',
     qrAria: 'Receive address QR code',
     warning: '⚠ Only send assets on the matching chain',
+  },
+
+  // ── Watch Wallet ──
+  watch: {
+    title: 'Watch Wallet',
+    emptyTitle: 'No watched addresses',
+    emptyDesc: 'Add any public address to monitor balances and transactions — useful for tracking whale wallets.',
+    addFirst: 'Add Address',
+    addTitle: 'Watch New Address',
+    chainLabel: 'Chain',
+    addressLabel: 'Address',
+    addressPlaceholder: '0x… or base58 address',
+    addressRequired: 'Address is required',
+    invalidAddress: 'Invalid address for this chain',
+    labelLabel: 'Label (optional)',
+    labelPlaceholder: 'e.g. Whale #1',
+    add: 'Add',
+    chainUnavailable: 'Chain adapter not available',
+    fetchingBalance: 'Fetching balance…',
+  },
+
+  // ── Price Chart ──
+  chart: {
+    loading: 'Loading chart…',
+    noCandles: 'Chart data not available',
+    noData: 'No price data found for this token',
   },
 
   // ── History ──

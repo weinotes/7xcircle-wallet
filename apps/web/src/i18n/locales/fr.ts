@@ -83,6 +83,8 @@ export default {
     send: 'Envoyer',
     receive: 'Recevoir',
     history: 'Historique',
+    watch: 'Observer',
+    viewChart: 'Graphique',
     lock: 'Verrouiller',
     sent: 'Envoyé',
     received: 'Reçu',
@@ -100,6 +102,32 @@ export default {
     copied: 'Copié !',
     noAccount: 'Aucun compte pour cette chaîne pour le moment',
     warning: '⚠ N\'envoyez que des actifs sur la chaîne correspondante',
+  },
+
+  // ── Portefeuille observé ──
+  watch: {
+    title: 'Portefeuille observé',
+    emptyTitle: 'Aucune adresse observée',
+    emptyDesc: 'Ajoutez une adresse publique pour surveiller les soldes et transactions — utile pour suivre les portefeuilles de baleines.',
+    addFirst: 'Ajouter une adresse',
+    addTitle: 'Observer une nouvelle adresse',
+    chainLabel: 'Chaîne',
+    addressLabel: 'Adresse',
+    addressPlaceholder: '0x… ou adresse base58',
+    addressRequired: 'Adresse requise',
+    invalidAddress: 'Adresse invalide pour cette chaîne',
+    labelLabel: 'Libellé (optionnel)',
+    labelPlaceholder: 'ex : Baleine #1',
+    add: 'Ajouter',
+    chainUnavailable: 'Adaptateur de chaîne indisponible',
+    fetchingBalance: 'Récupération du solde…',
+  },
+
+  // ── Graphique ──
+  chart: {
+    loading: 'Chargement du graphique…',
+    noCandles: 'Données de graphique indisponibles',
+    noData: 'Aucune donnée de prix trouvée pour ce jeton',
   },
 
   // ── Historique ──

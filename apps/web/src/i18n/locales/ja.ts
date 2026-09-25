@@ -83,6 +83,8 @@ export default {
     send: '送金',
     receive: '受け取り',
     history: '履歴',
+    watch: 'ウォッチ',
+    viewChart: 'チャート',
     lock: 'ロック',
     sent: '送金',
     received: '受け取り',
@@ -100,6 +102,32 @@ export default {
     copied: 'コピーしました!',
     noAccount: 'このチェーンのアカウントはありません',
     warning: '⚠ 一致するチェーンの資産のみを送金してください',
+  },
+
+  // ── ウォッチウォレット ──
+  watch: {
+    title: 'ウォッチウォレット',
+    emptyTitle: 'ウォッチ中のアドレスなし',
+    emptyDesc: '任意の公開アドレスを追加して残高と取引を監視——クジラ財布の追跡に最適。',
+    addFirst: 'アドレス追加',
+    addTitle: '新しいアドレスをウォッチ',
+    chainLabel: 'チェーン',
+    addressLabel: 'アドレス',
+    addressPlaceholder: '0x… または base58 アドレス',
+    addressRequired: 'アドレスを入力してください',
+    invalidAddress: 'このチェーンでは無効なアドレスです',
+    labelLabel: 'ラベル（任意）',
+    labelPlaceholder: '例：クジラ #1',
+    add: '追加',
+    chainUnavailable: 'チェーンアダプターが利用できません',
+    fetchingBalance: '残高取得中…',
+  },
+
+  // ── チャート ──
+  chart: {
+    loading: 'チャート読み込み中…',
+    noCandles: 'チャートデータが利用できません',
+    noData: 'このトークンの価格データが見つかりません',
   },
 
   // ── 取引履歴 ──

@@ -12,14 +12,15 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@ledgerhq/hw-app-eth": "^6.42.0",
-    "@ledgerhq/hw-transport-webusb": "^6.35.0",
     "@7xcircle/chains": "workspace:*",
     "@7xcircle/core": "workspace:*",
     "@7xcircle/shared": "workspace:*",
     "@7xcircle/ui": "workspace:*",
+    "@ledgerhq/hw-app-eth": "^6.42.0",
+    "@ledgerhq/hw-transport-webusb": "^6.35.0",
     "buffer": "^6.0.3",
     "i18next": "^26.4.0",
+    "lightweight-charts": "^5.2.1",
     "lucide-react": "^0.460.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.0.0",

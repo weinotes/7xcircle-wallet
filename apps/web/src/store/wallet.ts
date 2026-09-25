@@ -53,6 +53,10 @@ export interface WalletState {
   //     pubkey, device path. No key material ever exists for these.) ──
   hwAccounts: Account[];
 
+  // ─── Watch addresses (PERSISTED — public addresses the user monitors
+  //     without holding keys. Read-only: balance + history only.) ──
+  watchAddresses: WatchEntry[];
+
   // ─── Local pending transactions (NOT persisted — RAM only, refresh → gone) ──
   // Populated after Send broadcasts so Home/History can show them instantly
   // before the explorer API picks them up (10-30s delay typical).
@@ -104,6 +108,19 @@ export interface WalletState {
   recordApproval: (entry: Omit<TokenApproval, 'id' | 'revokedAt'>) => void;
   /** Flag a ledger entry revoked after the on-chain zero-approval confirmed */
   markApprovalRevoked: (id: string, at: number) => void;
+
+  /** Add a watch-only address (no key, read-only monitoring) */
+  addWatchAddress: (entry: WatchEntry) => void;
+  /** Remove a watch-only address */
+  removeWatchAddress: (address: string) => void;
+}
+
+/** A watched address — public info only, no key material */
+export interface WatchEntry {
+  address: string;
+  chainId: string;
+  label?: string;
+  addedAt: number;
 }
 
 export const useWalletStore = create<WalletState>()(
@@ -115,6 +132,7 @@ export const useWalletStore = create<WalletState>()(
       unlocked: false,
       accounts: [],
       hwAccounts: [],
+      watchAddresses: [],
 
       pendingTxs: {},
 
@@ -139,6 +157,7 @@ export const useWalletStore = create<WalletState>()(
           unlocked: false,
           accounts: [],
           hwAccounts: [],
+          watchAddresses: [],
           activeAccountId: null,
           pendingTxs: {},
           approvals: [],
@@ -241,6 +260,18 @@ export const useWalletStore = create<WalletState>()(
       markApprovalRevoked: (id, at) => set(state => ({
         approvals: markApprovalRevoked(state.approvals, id, at),
       })),
+
+      // ── Watch addresses (persisted public addresses, read-only) ──
+      addWatchAddress: (entry) => set(state => {
+        // Deduplicate by address+chainId
+        if (state.watchAddresses.some(w => w.address === entry.address && w.chainId === entry.chainId)) {
+          return state;
+        }
+        return { watchAddresses: [...state.watchAddresses, entry] };
+      }),
+      removeWatchAddress: (address) => set(state => ({
+        watchAddresses: state.watchAddresses.filter(w => w.address !== address),
+      })),
     }),
     {
       name: `${APP_NAME}-store`,
@@ -258,6 +289,8 @@ export const useWalletStore = create<WalletState>()(
         // device accounts are public key + path — safe and must survive locks,
         // unlike HD accounts they are not re-derived from the mnemonic
         hwAccounts: state.hwAccounts,
+        // watch addresses are public — read-only monitoring, no key material
+        watchAddresses: state.watchAddresses,
         // NOTE: accounts, unlocked, activeAccountId intentionally excluded
         // — they are re-derived from the mnemonic on each unlock
       }),

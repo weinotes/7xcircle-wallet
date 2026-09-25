@@ -30,6 +30,7 @@ export * from './security/tokenscan.js';
 export * from './security/solana.js';
 export * from './naming/ens.js';
 export * from './pricing/price.js';
+export * from './pricing/ohlcv.js';
 export * from './yield/lifi.js';
 
 import { chainRegistry } from '@7xcircle/core';

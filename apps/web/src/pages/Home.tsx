@@ -40,7 +40,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Lock, Send, ArrowLeftRight, TrendingUp, ArrowDownToLine, History as HistoryIcon, Settings, ArrowUpRight, ArrowDownLeft, Coins, RefreshCw, Plug, Copy, Check, ChevronDown, LayoutGrid } from 'lucide-react';
+import { Lock, Send, ArrowLeftRight, TrendingUp, ArrowDownToLine, History as HistoryIcon, Settings, ArrowUpRight, ArrowDownLeft, Coins, RefreshCw, Plug, Copy, Check, ChevronDown, LayoutGrid, BarChart3, Eye } from 'lucide-react';
 import { Button, IconButton, Card, ListRow, Skeleton, EmptyState } from '@7xcircle/ui';
 import { useWalletStore, selectActiveAccount } from '../store/wallet.js';
 import { chainRegistry } from '@7xcircle/core';
@@ -49,6 +49,15 @@ import { formatBalance, formatUsd } from '@7xcircle/shared';
 import type { TokenBalance } from '@7xcircle/shared';
 import { useTransactionHistory } from '../hooks/useTransactionHistory.js';
 import { usePortfolio } from '../hooks/usePortfolio.js';
+import { PriceChart } from './PriceChart.js';
+
+/** Which token (if any) has its price chart drawer open */
+interface ChartTarget {
+  chainId: string;
+  address: string;
+  symbol: string;
+  isNative: boolean;
+}
 
 export function Home() {
   const navigate = useNavigate();
@@ -57,6 +66,7 @@ export function Home() {
   const setActiveChain = useWalletStore(s => s.setActiveChain);
   const accounts = useWalletStore(s => s.accounts);
   const lock = useWalletStore(s => s.lock);
+  const [chartTarget, setChartTarget] = useState<ChartTarget | null>(null);
 
   const [tokens, setTokens] = useState<TokenBalance[]>([]);
   const [tokensLoading, setTokensLoading] = useState(false);
@@ -649,6 +659,27 @@ export function Home() {
                         ? `${formatUsd(tok.priceUsd)} / ${tok.symbol}`
                         : `${tok.decimals} decimals`}
                   </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setChartTarget({
+                        chainId: activeChainId,
+                        address: tok.address,
+                        symbol: tok.symbol,
+                        isNative: tok.isNative,
+                      });
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--ow-text-tertiary)',
+                      padding: 4,
+                    }}
+                    title={t('home.viewChart')}
+                  >
+                    <BarChart3 size={14} />
+                  </button>
                 </>
               }
             />
@@ -665,6 +696,7 @@ export function Home() {
         {actionTile('/earn', <TrendingUp size={20} />, t('home.earn'))}
         {actionTile('/receive', <ArrowDownToLine size={20} />, t('home.receive'))}
         {actionTile('/history', <HistoryIcon size={20} />, t('home.history'))}
+        {actionTile('/watch', <Eye size={20} />, t('home.watch'))}
         {/* dApp approvals only exist inside the extension popup */}
         {typeof chrome !== 'undefined' && Boolean((chrome as unknown as { runtime?: { id?: string } }).runtime?.id) && (
           actionTile('/dapp', <Plug size={20} />, t('home.dappRequests'))
@@ -763,6 +795,17 @@ export function Home() {
       <div className="ow-page--footer ow-faint" style={{ marginTop: 'auto', textAlign: 'center', fontSize: 'var(--ow-font-size-xs)' }}>
         {t('home.footer')}
       </div>
+
+      {/* ── Price chart drawer ──────────────────────────────────────── */}
+      {chartTarget && (
+        <PriceChart
+          chainId={chartTarget.chainId}
+          tokenAddress={chartTarget.address}
+          tokenSymbol={chartTarget.symbol}
+          isNative={chartTarget.isNative}
+          onClose={() => setChartTarget(null)}
+        />
+      )}
     </div>
   );
 }

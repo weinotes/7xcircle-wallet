@@ -29,6 +29,7 @@ import { Settings } from './pages/Settings.js';
 import { DappApprovals } from './pages/DappApprovals.js';
 import { Approvals } from './pages/Approvals.js';
 import { LedgerConnect } from './pages/LedgerConnect.js';
+import { WatchWallet } from './pages/WatchWallet.js';
 import { useWalletStore } from './store/wallet.js';
 import { useThemeSync } from './hooks/useThemeSync.js';
 import { registerAllChains } from '@7xcircle/chains';
@@ -127,6 +128,7 @@ function App() {
       <Route path="/receive" element={<Receive />} />
       <Route path="/history" element={<History />} />
       <Route path="/settings" element={<Settings />} />
+      <Route path="/watch" element={<WatchWallet />} />
       <Route path="/dapp" element={<DappApprovals />} />
       <Route path="/approvals" element={<Approvals />} />
       <Route path="/ledger" element={<LedgerConnect />} />

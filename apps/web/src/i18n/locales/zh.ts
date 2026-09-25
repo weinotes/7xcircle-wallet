@@ -101,6 +101,8 @@ export default {
     earn: '赚币',
     receive: '收款',
     history: '历史',
+    watch: '观察',
+    viewChart: 'K线图',
     dappRequests: 'DApp 请求',
     lock: '锁定',
     sent: '发送',
@@ -130,6 +132,32 @@ export default {
     noAccountHint: '解锁钱包后切换到您持有账户的链，再回来展示收款二维码。',
     qrAria: '收款地址二维码',
     warning: '⚠ 请仅发送对应链上的资产',
+  },
+
+  // ── 观察钱包 ──
+  watch: {
+    title: '观察钱包',
+    emptyTitle: '暂无观察地址',
+    emptyDesc: '添加任意公开地址来监控余额和交易——适合跟踪鲸鱼钱包。',
+    addFirst: '添加地址',
+    addTitle: '观察新地址',
+    chainLabel: '链',
+    addressLabel: '地址',
+    addressPlaceholder: '0x… 或 base58 地址',
+    addressRequired: '请输入地址',
+    invalidAddress: '该地址在此链上无效',
+    labelLabel: '标签（可选）',
+    labelPlaceholder: '例如：鲸鱼 #1',
+    add: '添加',
+    chainUnavailable: '链适配器不可用',
+    fetchingBalance: '获取余额中…',
+  },
+
+  // ── K线图 ──
+  chart: {
+    loading: '加载图表中…',
+    noCandles: 'K线数据暂不可用',
+    noData: '未找到该代币的价格数据',
   },
 
   // ── 交易历史 ──

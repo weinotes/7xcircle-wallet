@@ -84,6 +84,8 @@ export default {
     send: 'إرسال',
     receive: 'استلام',
     history: 'السجل',
+    watch: 'مراقبة',
+    viewChart: 'الرسم البياني',
     lock: 'قفل',
     sent: 'مرسل',
     received: 'مستلم',
@@ -101,6 +103,32 @@ export default {
     copied: 'تم النسخ!',
     noAccount: 'لا يوجد حساب لهذه السلسلة بعد',
     warning: '⚠ أرسل الأصول على السلسلة المطابقة فقط',
+  },
+
+  // ── محفظة المراقبة ──
+  watch: {
+    title: 'محفظة المراقبة',
+    emptyTitle: 'لا توجد عناوين مراقبة',
+    emptyDesc: 'أضف أي عنوان عام لمراقبة الأرصدة والمعاملات — مفيد لتتبع محافظ الحيتان.',
+    addFirst: 'إضافة عنوان',
+    addTitle: 'مراقبة عنوان جديد',
+    chainLabel: 'الشبكة',
+    addressLabel: 'العنوان',
+    addressPlaceholder: '0x… أو عنوان base58',
+    addressRequired: 'العنوان مطلوب',
+    invalidAddress: 'عنوان غير صالح لهذه الشبكة',
+    labelLabel: 'التسمية (اختياري)',
+    labelPlaceholder: 'مثال: حوت #1',
+    add: 'إضافة',
+    chainUnavailable: 'محول الشبكة غير متاح',
+    fetchingBalance: 'جاري جلب الرصيد…',
+  },
+
+  // ── الرسم البياني ──
+  chart: {
+    loading: 'جاري تحميل الرسم البياني…',
+    noCandles: 'بيانات الرسم البياني غير متاحة',
+    noData: 'لم يتم العثور على بيانات سعر هذا الرمز',
   },
 
   // ── سجل المعاملات ──

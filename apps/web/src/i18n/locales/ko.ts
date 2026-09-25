@@ -83,6 +83,8 @@ export default {
     send: '보내기',
     receive: '받기',
     history: '내역',
+    watch: '관찰',
+    viewChart: '차트',
     lock: '잠금',
     sent: '보냄',
     received: '받음',
@@ -100,6 +102,32 @@ export default {
     copied: '복사됨!',
     noAccount: '이 체인의 계정이 없습니다',
     warning: '⚠ 일치하는 체인의 자산만 보내세요',
+  },
+
+  // ── 관찰 지갑 ──
+  watch: {
+    title: '관찰 지갑',
+    emptyTitle: '관찰 중인 주소 없음',
+    emptyDesc: '공개 주소를 추가하여 잔액과 거래를 모니터링 — 고래 지갑 추적에 유용합니다.',
+    addFirst: '주소 추가',
+    addTitle: '새 주소 관찰',
+    chainLabel: '체인',
+    addressLabel: '주소',
+    addressPlaceholder: '0x… 또는 base58 주소',
+    addressRequired: '주소를 입력하세요',
+    invalidAddress: '이 체인에서 유효하지 않은 주소입니다',
+    labelLabel: '라벨 (선택)',
+    labelPlaceholder: '예: 고래 #1',
+    add: '추가',
+    chainUnavailable: '체인 어댑터를 사용할 수 없습니다',
+    fetchingBalance: '잔액 조회 중…',
+  },
+
+  // ── 차트 ──
+  chart: {
+    loading: '차트 로딩 중…',
+    noCandles: '차트 데이터를 사용할 수 없습니다',
+    noData: '이 토큰의 가격 데이터를 찾을 수 없습니다',
   },
 
   // ── 거래 내역 ──
