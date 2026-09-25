@@ -1,3 +1,27 @@
+/**
+ * Copyright 2026 Davey Wong <wgwcko@gmail.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+/**
+ * 7xCircle Wallet — Android client.
+ *
+ * Multi-chain surface on the shared core: TRON (TRX + USDT-TRC20), BNB,
+ * Solana and Ethereum lead the switcher, every other production EVM chain
+ * follows. Chain differences stay inside the adapters; this file only
+ * renders what they return. Testnet configs are deliberately excluded
+ * from derivation so test assets can never appear next to real funds.
+ */
 import * as SecureStore from 'expo-secure-store';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState, type ReactElement } from 'react';
@@ -11,21 +35,21 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { CHAIN_CONFIGS, registerAllChains } from '@open-wallet/chains';
+import { registerAllChains } from '@open-wallet/chains';
+import { chainRegistry } from '@open-wallet/core';
 import {
   createMnemonic,
   decryptVault,
   encryptVault,
   evaluatePassword,
-  getPrivateKey,
   isValidMnemonic,
-  chainRegistry,
   unlock as unlockSession,
   lock as lockSession,
-  touchActivity,
 } from '@open-wallet/core';
-import { formatBalance, wipeBytes } from '@open-wallet/shared';
-import type { Account, VaultData } from '@open-wallet/shared';
+import { formatBalance } from '@open-wallet/shared';
+import type { Account, TokenBalance, VaultData } from '@open-wallet/shared';
+import { PRODUCTION_CHAINS, orderedChains } from './src/chains';
+import { sendTx } from './src/tx';
 import {
   inspectBiometrics,
   isBiometricEnabled,
@@ -36,7 +60,6 @@ import {
 } from './src/biometric';
 
 const VAULT_KEY = 'open-wallet-mobile-vault';
-const ACTIVE_CHAIN = 'bsc-56';
 
 type Screen = 'loading' | 'welcome' | 'create' | 'import' | 'password' | 'wallet';
 
@@ -107,7 +130,7 @@ export default function App() {
       if (bioEnabled) {
         await savePasswordForBiometrics(password).catch(() => undefined);
       }
-      const nextAccounts = await unlockSession(nextVault, password, CHAIN_CONFIGS);
+      const nextAccounts = await unlockSession(nextVault, password, PRODUCTION_CHAINS);
       setVault(nextVault);
       setAccounts(nextAccounts);
       setPassword('');
@@ -125,7 +148,7 @@ export default function App() {
     setBusy(true);
     setError('');
     try {
-      setAccounts(await unlockSession(vault, password, CHAIN_CONFIGS));
+      setAccounts(await unlockSession(vault, password, PRODUCTION_CHAINS));
       // keep the biometric-cached password fresh on every password unlock —
       // silently no-ops unless the user enabled biometrics
       if (bioEnabled) {
@@ -151,7 +174,7 @@ export default function App() {
         setError('Biometric unlock unavailable — use your password.');
         return;
       }
-      setAccounts(await unlockSession(vault, cached, CHAIN_CONFIGS));
+      setAccounts(await unlockSession(vault, cached, PRODUCTION_CHAINS));
       setScreen('wallet');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unlock failed.');
@@ -226,27 +249,91 @@ function PasswordForm({ hasVault, password, confirmPassword, onPassword, onConfi
   </View>;
 }
 
+/** Multi-chain wallet: chain switcher → assets → send, same session accounts */
 function Wallet({ accounts, onLock, vault, bioStatus, bioEnabled, onBioChanged }: { accounts: Account[]; onLock: () => void; vault: VaultData | null; bioStatus: BiometricStatus | null; bioEnabled: boolean; onBioChanged: (enabled: boolean) => void }) {
-  const visible = accounts.filter(account => account.chainId === ACTIVE_CHAIN);
-  const account = visible[0];
-  const adapter = chainRegistry.get(ACTIVE_CHAIN);
-  const [balance, setBalance] = useState<string | null>(null);
+  const chains = orderedChains();
+  const [activeChainId, setActiveChainId] = useState(
+    () => chains.find(c => accounts.some(a => a.chainId === c.chainId))?.chainId ?? chains[0]?.chainId ?? '',
+  );
+  const account = accounts.find(a => a.chainId === activeChainId);
+  const adapter = chainRegistry.get(activeChainId);
+  const chainCfg = chains.find(c => c.chainId === activeChainId);
+
+  return <View style={styles.card}>
+    <Text style={styles.heading}>Assets</Text>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+      {chains.map(chain => {
+        const active = chain.chainId === activeChainId;
+        return <Pressable key={chain.chainId} onPress={() => setActiveChainId(chain.chainId)} style={[styles.chip, active && styles.chipActive]}>
+          <Text style={[styles.chipText, active && styles.chipTextActive]}>
+            {chain.nativeSymbol} · {chain.name === 'BNB Chain' ? 'BNB' : chain.name === 'TRON' ? 'TRON' : chain.name === 'Avalanche C-Chain' ? 'AVAX' : chain.name}
+          </Text>
+        </Pressable>;
+      })}
+    </ScrollView>
+    {!account && <Text style={styles.body}>This wallet has no account on {chainCfg?.name ?? activeChainId}.</Text>}
+    {account && adapter && chainCfg && (
+      <ChainAssets account={account} chainId={activeChainId} nativeSymbol={chainCfg.nativeSymbol} />
+    )}
+    {account && adapter && chainCfg && (
+      <SendForm account={account} chainId={activeChainId} nativeSymbol={chainCfg.nativeSymbol} />
+    )}
+    <Security vault={vault} bioStatus={bioStatus} bioEnabled={bioEnabled} onBioChanged={onBioChanged} />
+    <Button label="Lock wallet" onPress={onLock} secondary />
+  </View>;
+}
+
+/** Token list for one chain: native + whatever the adapter discovers */
+function ChainAssets({ account, chainId, nativeSymbol }: { account: Account; chainId: string; nativeSymbol: string }) {
+  const [tokens, setTokens] = useState<TokenBalance[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const adapter = chainRegistry.get(chainId);
+    if (!adapter) return;
+    let cancelled = false;
+    setTokens(null);
+    setFailed(false);
+    adapter.getAllTokenBalances(account.address)
+      .then(list => { if (!cancelled) setTokens(list); })
+      .catch(() => { if (!cancelled) { setFailed(true); setTokens(null); } });
+    return () => { cancelled = true; };
+  }, [account.address, chainId]);
+
+  return <View>
+    <Text style={styles.address}>{account.address}</Text>
+    {tokens === null && !failed && <Text style={styles.status}>Loading balances…</Text>}
+    {failed && <Text style={styles.status}>Balance lookup failed — check connectivity.</Text>}
+    {tokens?.map(token => {
+      const raw = token.balance || '0';
+      const zero = BigInt(raw) === 0n;
+      return <View key={`${token.chainId}-${token.address}`} style={styles.assetRow}>
+        <Text style={[styles.assetSymbol, zero && styles.assetZero]}>{token.symbol}</Text>
+        <Text style={[styles.assetBalance, zero && styles.assetZero]}>
+          {formatBalance(raw, token.decimals, 4)}
+        </Text>
+      </View>;
+    })}
+  </View>;
+}
+
+/**
+ * Send form for the selected chain: native or any discovered/entered token.
+ * Address validation and intent compilation live entirely in the adapter —
+ * TRON base58, Solana base58 and EVM 0x all take this same code path.
+ */
+function SendForm({ account, chainId, nativeSymbol }: { account: Account; chainId: string; nativeSymbol: string }) {
+  const adapter = chainRegistry.get(chainId);
   const [to, setTo] = useState('');
   const [amount, setAmount] = useState('');
+  const [tokenAddress, setTokenAddress] = useState('');
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState('');
 
-  useEffect(() => {
-    if (!account || !adapter) return;
-    adapter.getNativeBalance(account.address)
-      .then(raw => setBalance(formatBalance(raw, adapter.config.nativeDecimals, 6)))
-      .catch(() => setBalance(null));
-  }, [account?.address, adapter]);
-
   const send = async () => {
-    if (!account || !adapter) return;
+    if (!adapter) return;
     if (!adapter.validateAddress(to.trim())) {
-      setStatus('Enter a valid BNB address.');
+      setStatus(`Enter a valid ${nativeSymbol} address.`);
       return;
     }
     if (!amount || Number(amount) <= 0) {
@@ -255,45 +342,52 @@ function Wallet({ accounts, onLock, vault, bioStatus, bioEnabled, onBioChanged }
     }
     setSending(true);
     setStatus('');
-    let privateKey: Uint8Array | null = null;
     try {
-      touchActivity();
-      // Mobile only sends the native coin today, so one intent covers it.
-      // `buildTransaction` fills nonce/gas/fees itself — the old code fed
-      // the estimate back in, which the adapter ignored and re-estimated.
-      const intent = {
-        kind: 'native-transfer' as const,
-        to: to.trim(),
-        amountRaw: adapter.parseAmount(amount),
-      };
-      const opts = { from: account.address, feeTier: 'normal' as const };
-
-      const built = await adapter.buildTransaction(intent, opts);
-      privateKey = getPrivateKey(account);
-      const signed = await adapter.signTransaction(built, privateKey);
-      const hash = await adapter.sendTransaction(signed);
-      setStatus(`Sent: ${hash.slice(0, 12)}…`);
+      const intent = tokenAddress.trim()
+        ? await buildTokenIntent(tokenAddress.trim())
+        : {
+            kind: 'native-transfer' as const,
+            to: to.trim(),
+            amountRaw: adapter.parseAmount(amount),
+          };
+      if (!intent) return;
+      const hash = await sendTx({ adapter, account, intent });
+      setStatus(`Sent: ${hash.slice(0, 14)}…`);
       setTo('');
       setAmount('');
+      setTokenAddress('');
     } catch (cause) {
       setStatus(cause instanceof Error ? cause.message : 'Transaction failed.');
     } finally {
-      if (privateKey) wipeBytes(privateKey);
       setSending(false);
     }
   };
 
-  return <View style={styles.card}>
-    <Text style={styles.heading}>Wallet ready</Text>
-    {visible.map(account => <View key={account.id} style={styles.account}><Text style={styles.accountName}>{account.nickname}</Text><Text style={styles.address}>{account.address}</Text></View>)}
-    <Text style={styles.balance}>{balance === null ? 'Balance unavailable' : `${balance} BNB`}</Text>
-    <Text style={styles.section}>Send BNB on BNB Chain</Text>
+  /** Resolve token decimals from the contract before building the intent */
+  const buildTokenIntent = async (contract: string) => {
+    if (!adapter) return null;
+    try {
+      const info = await adapter.getTokenInfo(contract);
+      return {
+        kind: 'token-transfer' as const,
+        token: contract,
+        decimals: info.decimals,
+        to: to.trim(),
+        amountRaw: adapter.parseTokenAmount(amount, info.decimals),
+      };
+    } catch {
+      setStatus('That token contract did not answer — check the address.');
+      return null;
+    }
+  };
+
+  return <View>
+    <Text style={styles.section}>Send on {chainId}</Text>
     <TextInput autoCapitalize="none" value={to} onChangeText={setTo} placeholder="Recipient address" placeholderTextColor="#78818f" style={styles.input} />
-    <TextInput keyboardType="decimal-pad" value={amount} onChangeText={setAmount} placeholder="Amount" placeholderTextColor="#78818f" style={styles.input} />
+    <TextInput keyboardType="decimal-pad" value={amount} onChangeText={setAmount} placeholder={`Amount (${nativeSymbol} if native)`} placeholderTextColor="#78818f" style={styles.input} />
+    <TextInput autoCapitalize="none" value={tokenAddress} onChangeText={setTokenAddress} placeholder="Token contract / mint (optional — empty sends native)" placeholderTextColor="#78818f" style={styles.input} />
     <Button label={sending ? 'Sending…' : 'Send'} onPress={send} disabled={sending} />
     {status ? <Text style={styles.status}>{status}</Text> : null}
-    <Security vault={vault} bioStatus={bioStatus} bioEnabled={bioEnabled} onBioChanged={onBioChanged} />
-    <Button label="Lock wallet" onPress={onLock} secondary />
   </View>;
 }
 
@@ -391,4 +485,13 @@ const styles = StyleSheet.create({
   balance: { color: '#78a9ff', fontSize: 24, fontWeight: '700' },
   section: { color: '#f5f7fa', fontSize: 16, fontWeight: '700', marginTop: 8 },
   status: { color: '#b4bfcd', fontSize: 13, lineHeight: 18 },
+  chipRow: { flexDirection: 'row', gap: 8 },
+  chip: { backgroundColor: '#252a33', borderColor: '#424b59', borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
+  chipActive: { backgroundColor: '#78a9ff', borderColor: '#78a9ff' },
+  chipText: { color: '#d8e0eb', fontSize: 13, fontWeight: '600' },
+  chipTextActive: { color: '#101114' },
+  assetRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#303641' },
+  assetSymbol: { color: '#f5f7fa', fontWeight: '700' },
+  assetBalance: { color: '#78a9ff', fontWeight: '600' },
+  assetZero: { opacity: 0.4 },
 });

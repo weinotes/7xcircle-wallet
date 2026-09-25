@@ -65,11 +65,12 @@ pnpm --filter @open-wallet/mobile android # build/run on Android device or emula
 The Android app is an Expo/React Native client using the same wallet core and chain adapters.
 The encrypted vault is stored with Android SecureStore. Run `pnpm install`, then use
 `pnpm --filter @open-wallet/mobile android` with Android Studio/SDK installed.
-The current mobile MVP supports wallet creation/import, secure unlock,
-optional fingerprint / face unlock (Keystore-gated password cache with a
-password fallback), BNB balance, and native BNB transfers. Solana mobile
-screens are being wired into
-the shared adapters.
+The mobile app now covers all production chains with a switcher — TRON (TRX +
+USDT-TRC20), BNB Chain, Solana and Ethereum first — showing adapter-discovered
+token balances and sending native or token transfers through the same
+chain-agnostic intent pipeline as the web app. It also supports optional
+fingerprint / face unlock (Keystore-gated password cache with a password
+fallback). Swap and dApp browsing are web/extension-only for now.
 
 ### Browser extension
 
