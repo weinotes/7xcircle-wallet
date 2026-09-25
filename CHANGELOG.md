@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Multi-account HD wallets: `unlock()` derives per-chain account counts
+  (persisted), Home gains an account switcher chip row with “+ Add
+  account”, and every money page resolves its signer through a shared
+  `selectActiveAccount` — chain switches re-point it atomically.
+- Extension dApp protocol completed: `wallet_switchEthereumChain` is now
+  a user-approval prompt (admin tier) that atomically moves the wallet UI
+  and the broker's `eth_chainId` answer, and `eth_signTypedData_v4`
+  signs real EIP-712 payloads (viem digest, cross-verified against
+  ethers v6 byte-for-byte; Ledger accounts get an honest decline).
+
+### Fixed
+- Typed-data requests from dApps are order-tolerant on `[from, data]`
+  params and refuse to sign for an account other than the connected one.
 - Mobile Swap goes multi-chain: an EVM route section gated on a build-time
   `EXPO_PUBLIC_ZEROX_API_KEY` (0x quotes, approve → wait → swap chaining),
   chain chips across every held account, and custom-contract pairs —

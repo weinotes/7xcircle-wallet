@@ -16,6 +16,7 @@
 export * from './configs.js';
 export * from './evm/adapter.js';
 export * from './evm/explorer.js';
+export * from './evm/typedData.js';
 export * from './solana/adapter.js';
 export * from './solana/jupiter.js';
 export * from './solana/jito.js';

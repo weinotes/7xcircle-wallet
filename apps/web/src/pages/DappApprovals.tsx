@@ -29,20 +29,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ShieldAlert, Signature, Send as SendIcon, Plug } from 'lucide-react';
+import { ArrowLeft, ShieldAlert, Signature, Send as SendIcon, Plug, ArrowLeftRight } from 'lucide-react';
 import { Button } from '@7xcircle/ui';
 import {
   chainRegistry,
   getPrivateKey,
   grantPermission,
+  signDigest,
   signPersonalMessage,
   touchActivity,
 } from '@7xcircle/core';
-import { useWalletStore } from '../store/wallet.js';
+import { useWalletStore, selectActiveAccount } from '../store/wallet.js';
 import { signForAccount } from '../hw/signFor.js';
 import { ledgerPathOf, ledgerSignMessage, openEthApp } from '../hw/ledger.js';
-import { CHAIN_CONFIGS } from '@7xcircle/chains';
-import { parseErc20ApprovalCalldata } from '@7xcircle/shared';
+import { CHAIN_CONFIGS, hashTypedDataV4 } from '@7xcircle/chains';
+import { fromHex, parseErc20ApprovalCalldata } from '@7xcircle/shared';
 import type { SitePermission } from '@7xcircle/core';
 
 interface PendingRequest {
@@ -62,15 +63,15 @@ const inExtension = typeof chrome !== 'undefined' && Boolean(chrome.runtime?.id)
 export function DappApprovals() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const accounts = useWalletStore(s => s.accounts);
   const activeChainId = useWalletStore(s => s.activeChainId);
+  const setActiveChain = useWalletStore(s => s.setActiveChain);
   const unlocked = useWalletStore(s => s.unlocked);
 
   const [requests, setRequests] = useState<PendingRequest[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const portRef = useRef<chrome.runtime.Port | null>(null);
 
-  const account = accounts.find(a => a.chainId === activeChainId);
+  const account = useWalletStore(selectActiveAccount);
   const adapter = chainRegistry.get(activeChainId);
   const chainCfg = CHAIN_CONFIGS.find(c => c.chainId === activeChainId);
   const chainHex = useMemo(
@@ -154,6 +155,52 @@ export function DappApprovals() {
         return;
       }
 
+      if (req.method === 'eth_signTypedData_v4') {
+        // MetaMask's [from, data] ordering is the convention, but dApps have
+        // shipped both — detect by shape, and honour the from field when one
+        // of the two params is an address.
+        const [a, b] = req.params ?? [];
+        const aIsJson = typeof a === 'string' && a.trim().startsWith('{');
+        const payload = aIsJson ? String(a) : String(b ?? '');
+        const signer = aIsJson ? String(b ?? '') : String(a ?? '');
+        if (/^0x[0-9a-fA-F]{40}$/.test(signer) && signer.toLowerCase() !== account.address.toLowerCase()) {
+          resolve(req.id, false, undefined, { code: 4001, message: 'Signer is not the active account' });
+          return;
+        }
+        if (account.source === 'ledger') {
+          // honest decline: the device app's EIP-712 path is not wired yet
+          resolve(req.id, false, undefined, { code: 4200, message: 'Typed data signing on Ledger is not supported yet' });
+          return;
+        }
+        const digest = fromHex(hashTypedDataV4(payload));
+        touchActivity();
+        const pk = getPrivateKey(account);
+        try {
+          const sig = signDigest(digest, pk);
+          resolve(req.id, true, sig);
+        } finally {
+          pk.fill(0);
+        }
+        return;
+      }
+
+      if (req.method === 'wallet_switchEthereumChain') {
+        const requested = String((req.params?.[0] as { chainId?: string } | undefined)?.chainId ?? '');
+        const decimal = Number.parseInt(requested, 16);
+        const target = CHAIN_CONFIGS.find(c => c.chainIdDecimal === decimal);
+        if (!target) {
+          resolve(req.id, false, undefined, { code: 4902, message: `Unrecognized chain ${requested}` });
+          return;
+        }
+        // both views of "active chain": the wallet UI's registry key AND the
+        // broker's hex (what eth_chainId answers and the permission ledger
+        // bounds) — a dApp must never see a chain the popup is not on.
+        setActiveChain(target.chainId);
+        await chrome.storage.local.set({ 'dapp:chainId': requested.toLowerCase() });
+        resolve(req.id, true, null);
+        return;
+      }
+
       if (req.method === 'eth_sendTransaction') {
         const tx = (req.params?.[0] ?? {}) as { from?: string; to?: string; value?: string; data?: string };
         if (!tx.to) throw new Error('transaction is missing "to"');
@@ -224,7 +271,9 @@ export function DappApprovals() {
       ? <Signature size={18} />
       : m === 'eth_sendTransaction'
         ? <SendIcon size={18} />
-        : <Plug size={18} />;
+        : m === 'wallet_switchEthereumChain'
+          ? <ArrowLeftRight size={18} />
+          : <Plug size={18} />;
 
   return (
     <div style={{ padding: 'var(--ow-space-4)', maxWidth: 560, margin: '0 auto' }}>
@@ -262,6 +311,15 @@ export function DappApprovals() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
             {iconFor(req.method)}
             <span>{req.method}</span>
+            {req.method === 'wallet_switchEthereumChain' && (() => {
+              const decimal = Number.parseInt(String((req.params?.[0] as { chainId?: string } | undefined)?.chainId ?? ''), 16);
+              const target = CHAIN_CONFIGS.find(c => c.chainIdDecimal === decimal);
+              return (
+                <span style={{ fontWeight: 400, fontSize: 'var(--ow-font-size-sm)', color: 'var(--ow-info)' }}>
+                  → {target?.name ?? `0x${decimal.toString(16)}`}
+                </span>
+              );
+            })()}
           </div>
           <div style={{ fontSize: 'var(--ow-font-size-sm)' }}>
             <ShieldAlert size={13} style={{ display: 'inline', verticalAlign: -2 }} /> {req.origin}

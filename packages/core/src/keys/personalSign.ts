@@ -47,15 +47,25 @@ export function hashPersonalMessage(bytes: Uint8Array): Uint8Array {
   return keccak_256(joined);
 }
 
+/**
+ * Sign a ready-made 32-byte digest with the secp256k1 key, returning the
+ * 65-byte 0x-hex signature (r ‖ s ‖ v, v = recovery + 27, low-s enforced).
+ * Shared by personal_sign and EIP-712 typed data — the digest construction
+ * differs, the wire signature does not.
+ */
+export function signDigest(digest: Uint8Array, privateKey: Uint8Array): string {
+  const sig = secp256k1.sign(digest, privateKey, { lowS: true });
+  const out = new Uint8Array(65);
+  out.set(sig.toCompactRawBytes(), 0);
+  out[64] = sig.recovery + 27;
+  return '0x' + toHex(out);
+}
+
 /** Full personal_sign: message param → 65-byte 0x-hex signature */
 export function signPersonalMessage(
   messageParam: string,
   privateKey: Uint8Array,
 ): string {
   const digest = hashPersonalMessage(messageParamToBytes(messageParam));
-  const sig = secp256k1.sign(digest, privateKey, { lowS: true });
-  const out = new Uint8Array(65);
-  out.set(sig.toCompactRawBytes(), 0);
-  out[64] = sig.recovery + 27;
-  return '0x' + toHex(out);
+  return signDigest(digest, privateKey);
 }

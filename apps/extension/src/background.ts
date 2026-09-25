@@ -139,7 +139,7 @@ async function handleRpc(
     return;
   }
 
-  // prompt-connect / prompt-sign / prompt-send → queue for the popup
+  // prompt-connect / prompt-sign / prompt-send / prompt-admin → queue for the popup
   const id = `${Date.now()}-${++counter}`;
   const request: PendingRequest = {
     id,

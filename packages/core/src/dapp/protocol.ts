@@ -112,6 +112,7 @@ export type Verdict =
   | { kind: 'prompt-connect'; method: string }
   | { kind: 'prompt-sign'; method: string }
   | { kind: 'prompt-send'; method: string }
+  | { kind: 'prompt-admin'; method: string }
   | { kind: 'reject'; error: { code: number; message: string } }
   | { kind: 'unsupported'; method: string };
 
@@ -168,8 +169,13 @@ export function gate(params: {
 
   if (tier === 'sign') return { kind: 'prompt-sign', method: params.method };
   if (tier === 'send') return { kind: 'prompt-send', method: params.method };
-  // admin methods are self-contained (switch/add/revoke) — handled by broker
-  return { kind: 'allow', method: params.method };
+  // admin methods mutate the wallet's own state (which chain is active) —
+  // the user must see and accept that. revokePermission stays broker-side:
+  // it only takes rights away, and denying it would be the real trap.
+  if (params.method === 'wallet_revokePermissions') {
+    return { kind: 'allow', method: params.method };
+  }
+  return { kind: 'prompt-admin', method: params.method };
 }
 
 // ─── request descriptor (what the approval UI receives) ─────────────
