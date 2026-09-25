@@ -45,6 +45,13 @@ export interface BuildOpts {
   from: string;
   /** Fee speed tier — maps to each chain's own acceleration strategy */
   feeTier?: FeeTier;
+  /**
+   * EVM only: pin the transaction nonce instead of filling it from the RPC.
+   * This is how a pending transaction is replaced — a speed-up re-broadcasts
+   * the same payload under the original nonce, a cancel overwrites it with a
+   * self-send. Ignored by non-EVM adapters.
+   */
+  nonceOverride?: number;
 }
 
 /**

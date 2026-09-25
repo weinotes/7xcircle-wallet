@@ -328,10 +328,13 @@ export class EvmAdapter implements ChainAdapter {
     const call = compileIntent(intent);
     const from = opts.from;
 
-    // Fill nonce from RPC
-    const nonce = await this.publicClient.getTransactionCount({
-      address: from as Address,
-    });
+    // Nonce: an explicit override replaces a pending transaction (speed-up /
+    // cancel must reuse the stuck nonce); otherwise fill from the RPC.
+    const nonce =
+      opts.nonceOverride ??
+      (await this.publicClient.getTransactionCount({
+        address: from as Address,
+      }));
 
     // Estimate gas for the actual operation (not hard-coded 21000)
     const gasEstimate = await this.publicClient.estimateGas({

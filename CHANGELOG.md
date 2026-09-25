@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- ENS name resolution in Send (EVM chains): type `name.eth`, get the resolved
+  address reviewed before signing. Pure wire contract (EIP-137 namehash +
+  two `eth_call`s), RPC failover across the configured mainnet endpoints,
+  byte-for-byte cross-verified against `viem/ens`, and a live mainnet probe
+  (`scripts/ens-test.ts`). Unresolved names can never reach the sign path.
+- Transaction speed-up and cancel for pending EVM transactions in History:
+  same-nonce replacement (identical payload at a faster fee, or an empty
+  self-send to overwrite), reviewed through the same confirmation modal as
+  Send and executed through the same signing pipeline.
+- Business boundary in MONETIZATION.md: personal open-source project — no
+  fiat on/off-ramps, no market making, no custody; third-party fee sharing
+  only.
 - Design tokens: themeable P&L semantics (`--ow-positive/negative/pending`),
   badge wash backgrounds, motion durations, z-index scale, font-weight scale.
 - Shared keyframes (`ow-spin`, `ow-shimmer`) with a `prefers-reduced-motion`

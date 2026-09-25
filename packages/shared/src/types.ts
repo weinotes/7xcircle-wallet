@@ -190,6 +190,19 @@ export interface TransactionRecord {
   status: 'pending' | 'confirmed' | 'failed';
   direction: 'sent' | 'received';
   fee?: string;
+  /**
+   * EVM only: enough of the broadcast payload to REPLACE the transaction —
+   * speed-up re-sends it under the same nonce at a higher fee, cancel
+   * overwrites that nonce with a self-send. Only locally-tracked pending
+   * txs carry it; explorer history does not need it.
+   */
+  replay?: {
+    to: string;
+    value: string;
+    data?: string;
+    nonce: number;
+    gasLimit: string;
+  };
 }
 
 /** Wallet vault encrypted storage format */

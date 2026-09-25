@@ -28,14 +28,15 @@
 import { useEffect, useState, type JSX } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, ArrowUpRight, ArrowDownRight, Clock, CheckCircle2, XCircle, RefreshCw, ExternalLink, Inbox } from 'lucide-react';
-import { Button, IconButton, Card, Skeleton, EmptyState } from '@7xcircle/ui';
+import { ArrowLeft, ArrowUpRight, ArrowDownRight, Clock, CheckCircle2, XCircle, RefreshCw, ExternalLink, Inbox, Zap, Ban } from 'lucide-react';
+import { Button, IconButton, Card, Skeleton, EmptyState, Modal } from '@7xcircle/ui';
 import { useWalletStore } from '../store/wallet.js';
 import { CHAIN_CONFIGS } from '@7xcircle/chains';
 import { useTransactionHistory } from '../hooks/useTransactionHistory.js';
+import { useTxFlow } from '../hooks/useTxFlow.js';
 import { chainRegistry } from '@7xcircle/core';
 import { formatBalance } from '@7xcircle/shared';
-import type { TransactionRecord } from '@7xcircle/shared';
+import type { TransactionRecord, TxIntent } from '@7xcircle/shared';
 
 function truncateHash(hash: string): string {
   return `${hash.slice(0, 10)}…${hash.slice(-8)}`;
@@ -101,6 +102,7 @@ export function History() {
   const { t } = useTranslation();
   const activeChainId = useWalletStore(s => s.activeChainId);
   const accounts = useWalletStore(s => s.accounts);
+  const removePendingTx = useWalletStore(s => s.removePendingTx);
   const fromAccount = accounts.find(a => a.chainId === activeChainId);
   const activeChain = CHAIN_CONFIGS.find(c => c.chainId === activeChainId);
   const adapter = chainRegistry.get(activeChainId);
@@ -109,6 +111,14 @@ export function History() {
     activeChainId,
     fromAccount?.address,
   );
+
+  // Replacement (speed-up / cancel) runs the SAME pipeline as Send, one
+  // tier faster, pinned to the stuck transaction's nonce.
+  const flow = useTxFlow({ adapter, account: fromAccount, chainId: activeChainId, feeTier: 'fast' });
+  const [replacement, setReplacement] = useState<
+    { tx: TransactionRecord; mode: 'speedup' | 'cancel' } | null
+  >(null);
+  const replacing = ['building', 'signing', 'broadcasting', 'pending'].includes(flow.status);
 
   // Periodic refresh while we have pending txs — explorer picks them up ~10-30s after broadcast
   const hasPending = transactions.some(t => t.status === 'pending');
@@ -119,6 +129,38 @@ export function History() {
   }, [hasPending, refresh]);
 
   const getExplorerUrl = (txHash: string) => adapter?.getExplorerTxUrl?.(txHash) ?? null;
+
+  /**
+   * Broadcast the replacement. The stuck record is dropped FIRST — the new
+   * hash enters the pending list through the pipeline's own bookkeeping, and
+   * the old one can never land now that its nonce is overwritten.
+   */
+  const confirmReplace = async () => {
+    const pending = replacement;
+    const replay = pending?.tx.replay;
+    if (!pending || !replay || !fromAccount) return;
+    const { tx, mode } = pending;
+    setReplacement(null);
+    removePendingTx(activeChainId, tx.hash);
+    const intent: TxIntent = mode === 'cancel'
+      // Cancel = a do-nothing self-send at the same nonce — the cheapest
+      // payload that can overwrite a stuck transaction.
+      ? { kind: 'native-transfer', to: fromAccount.address, amountRaw: '0' }
+      // Speed-up = byte-identical payload, only the fee changes.
+      : { kind: 'contract-call', to: replay.to, data: replay.data ?? '0x', valueRaw: replay.value };
+    await flow.send(
+      intent,
+      {
+        displayTo: mode === 'cancel' ? fromAccount.address : replay.to,
+        amountRaw: mode === 'cancel' ? '0' : replay.value,
+        ...(tx.tokenSymbol && mode === 'speedup'
+          ? { token: { symbol: tx.tokenSymbol, address: tx.tokenAddress ?? '', decimals: tx.tokenDecimals ?? 18, isNative: false } }
+          : {}),
+      },
+      { nonceOverride: replay.nonce },
+    );
+    refresh();
+  };
 
   function formatAmount(tx: TransactionRecord): { text: string; symbol: string; isPositive: boolean } {
     if (tx.tokenSymbol) {
@@ -271,7 +313,7 @@ export function History() {
                   </div>
                 </div>
 
-                {/* Right: amount */}
+                {/* Right: amount (+ replacement actions while pending) */}
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div className="ow-mono" style={{
                     fontWeight: 600,
@@ -283,12 +325,80 @@ export function History() {
                   <div style={{ fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-text-secondary)' }}>
                     {amt.symbol}
                   </div>
+                  {tx.status === 'pending' && tx.replay && !replacing && (
+                    <div style={{ display: 'flex', gap: 'var(--ow-space-1)', marginTop: 'var(--ow-space-1)' }}>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setReplacement({ tx, mode: 'speedup' })}
+                        title={t('history.speedUpHint')}
+                      >
+                        <Zap size={12} /> {t('history.speedUp')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setReplacement({ tx, mode: 'cancel' })}
+                        title={t('history.cancelHint')}
+                      >
+                        <Ban size={12} /> {t('history.cancel')}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             );
           })}
         </div>
       )}
+
+      {/* Replacement progress banner — the pipeline's phase, verbatim */}
+      {replacing && (
+        <div role="status" style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--ow-space-2)',
+          padding: 'var(--ow-space-2) var(--ow-space-4)',
+          borderRadius: 'var(--ow-radius-lg)',
+          backgroundColor: 'var(--ow-warning-bg)',
+          color: 'var(--ow-pending-fg)',
+          fontSize: 'var(--ow-font-size-sm)',
+        }}>
+          {flow.error ?? t(`history.replace_${flow.status}`)}
+        </div>
+      )}
+
+      {/* Confirm before spending a fee on a replacement — money operations
+          always pass through a review, same rule as Send. */}
+      <Modal
+        open={replacement !== null}
+        onClose={() => setReplacement(null)}
+        title={replacement?.mode === 'cancel' ? t('history.cancelTitle') : t('history.speedUpTitle')}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setReplacement(null)}>{t('common.cancel')}</Button>
+            <Button variant={replacement?.mode === 'cancel' ? 'danger' : 'primary'} onClick={() => void confirmReplace()}>
+              {t('history.confirmReplace')}
+            </Button>
+          </>
+        }
+      >
+        {replacement && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--ow-space-3)', fontSize: 'var(--ow-font-size-sm)' }}>
+            <p style={{ margin: 0, color: 'var(--ow-text-secondary)' }}>
+              {replacement.mode === 'cancel'
+                ? t('history.cancelDesc')
+                : t('history.speedUpDesc')}
+            </p>
+            <div className="ow-mono ow-faint" style={{ fontSize: 'var(--ow-font-size-xs)', wordBreak: 'break-all' }}>
+              {replacement.tx.hash}
+            </div>
+            <div style={{ color: 'var(--ow-text-secondary)' }}>
+              {t('history.nonce')}: {replacement.tx.replay?.nonce}
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Footer */}
       {transactions.length > 0 && (

@@ -79,7 +79,7 @@ export interface UseTxFlowResult {
    * confirmed, and `status` cannot be read from the hook closure — React state
    * captured before the await is always stale.
    */
-  send: (intent: TxIntent, meta: TxMeta) => Promise<TxFlowStatus>;
+  send: (intent: TxIntent, meta: TxMeta, opts?: { nonceOverride?: number }) => Promise<TxFlowStatus>;
   /**
    * Send a transaction built OUTSIDE the wallet (a Jupiter/0x aggregator
    * quote). Same sign → broadcast → retry pipeline, only the build step
@@ -231,6 +231,19 @@ export function useTxFlow({
           blockTimestamp: Math.floor(Date.now() / 1000),
           status: 'pending',
           direction: 'sent',
+          // EVM pending txs keep their payload so History can replace them
+          // (speed-up / cancel) under the same nonce while they are stuck.
+          ...(unsigned.chainType === 'evm' && unsigned.nonce !== undefined
+            ? {
+                replay: {
+                  to: unsigned.to,
+                  value: unsigned.value ?? '0',
+                  ...(unsigned.data && unsigned.data !== '0x' ? { data: unsigned.data } : {}),
+                  nonce: unsigned.nonce,
+                  gasLimit: unsigned.gasLimit ?? '21000',
+                },
+              }
+            : {}),
           ...(meta.token
             ? {
                 tokenSymbol: meta.token.symbol,
@@ -276,12 +289,13 @@ export function useTxFlow({
     return 'pending';
   }, [adapter, account, chainId, feeTier, addPendingTx, removePendingTx]);
 
-  const send = useCallback(async (intent: TxIntent, meta: TxMeta): Promise<TxFlowStatus> => {
+  const send = useCallback(async (intent: TxIntent, meta: TxMeta, opts?: { nonceOverride?: number }): Promise<TxFlowStatus> => {
     // builder is only invoked after runPipeline's adapter/account guard
     return runPipeline(
       () => (adapter as ChainAdapter).buildTransaction(intent, {
         from: (account as Account).address,
         feeTier,
+        ...(opts?.nonceOverride !== undefined ? { nonceOverride: opts.nonceOverride } : {}),
       }),
       meta,
       // wallet-built txs get a fresh blockhash every attempt → retry works
