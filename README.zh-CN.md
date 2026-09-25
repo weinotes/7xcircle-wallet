@@ -23,7 +23,7 @@
 - 区块浏览器 API 查询交易历史
 - 加密保险库：AES-256-GCM + PBKDF2-SHA512（20 万次迭代）
 - 页面隐藏自动锁定（5 分钟），会话密钥仅存内存
-- 暗 / 亮主题，中英文切换
+- 暗 / 亮主题，六语言切换（英 / 中 / 日 / 法 / 韩 / 阿，支持 RTL）
 
 ## 技术栈
 
@@ -35,7 +35,6 @@
 | 加密底层 | noble-curves、tweetnacl、bip39、@scure/bip32 |
 | EVM | viem 2.x |
 | Solana | @solana/web3.js |
-| 存储 | 跨平台抽象（localStorage / MMKV / Tauri Store） |
 
 ## 仓库结构
 
@@ -49,8 +48,7 @@ open-wallet/
 │   ├── core/         # 钱包核心：密钥、保险库加密、会话、链抽象
 │   ├── chains/       # 链适配器（EVM / Solana / TRON）
 │   ├── ui/           # 共享 UI 组件
-│   ├── shared/       # 共享类型、工具函数、常量
-│   └── storage/      # 跨平台加密存储抽象
+│   └── shared/       # 共享类型、工具函数、常量
 └── scripts/          # 开发工具（如 EVM 发送流程集成测试）
 ```
 

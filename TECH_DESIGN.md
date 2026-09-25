@@ -45,8 +45,7 @@ open-wallet/
 │   ├── core/         # 钱包核心：密钥、签名、链适配
 │   ├── chains/       # 各链适配实现 (EVM / Solana / ...)
 │   ├── ui/           # 共享 UI 组件库
-│   ├── shared/       # 共享类型、工具函数、常量
-│   └── storage/      # 跨平台加密存储抽象
+│   └── shared/       # 共享类型、工具函数、常量
 ├── pnpm-workspace.yaml
 ├── turbo.json
 └── package.json
@@ -70,7 +69,7 @@ open-wallet/
 | **EVM 链 SDK** | viem 2.x | 轻量、类型安全、支持所有 EVM 链 |
 | **Solana SDK** | @solana/web3.js 2.x | 官方 SDK，v2 重构后性能更好 |
 | **助记词** | bip39 + bip32 + slip-0044 | 行业标准 HD 钱包派生 |
-| **本地存储** | localStorage / MMKV / Tauri Store | 各平台原生存储，统一抽象层 |
+| **本地存储** | localStorage / MMKV / Tauri Store | 各平台原生存储 |
 | **数据加密** | Web Crypto API (AES-GCM) | 浏览器原生，密钥派生用 PBKDF2 |
 | **图标** | Lucide React | 统一图标风格 |
 | **样式** | Tailwind CSS 3 + CSS Variables | 设计 Token 统一管理 |
@@ -291,22 +290,6 @@ interface WalletState {
 - `session` 状态只存在于内存，刷新页面需重新输入密码
 - 私钥数组在应用失焦/锁屏后自动清理
 - 所有敏感操作（签名、发送）需要密码二次确认
-
-### 3.5 跨平台存储抽象层（`packages/storage`）
-
-```typescript
-// packages/storage/src/storage.ts
-
-export interface SecureStorage {
-  get(key: string): Promise<string | null>;
-  set(key: string, value: string): Promise<void>;
-  remove(key: string): Promise<void>;
-}
-
-// Web 实现 → localStorage（仅存加密后的 Vault，不存明文）
-// Mobile 实现 → MMKV + iOS Keychain / Android Keystore
-// Desktop 实现 → Tauri Store（文件系统 + OS Keychain 可选）
-```
 
 ---
 

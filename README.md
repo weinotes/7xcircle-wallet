@@ -23,7 +23,7 @@
 - Transaction history via block explorer APIs
 - Encrypted vault: AES-256-GCM + PBKDF2-SHA512 (200,000 iterations)
 - Auto-lock on tab hidden (5 min), session keys kept in memory only
-- Dark / light theme, zh / en i18n
+- Dark / light theme, 6-language i18n (en / zh / ja / fr / ko / ar, RTL ready)
 
 ## Tech Stack
 
@@ -35,7 +35,6 @@
 | Crypto | noble-curves, tweetnacl, bip39, @scure/bip32 |
 | EVM | viem 2.x |
 | Solana | @solana/web3.js |
-| Storage | Cross-platform abstraction (localStorage / MMKV / Tauri Store) |
 
 ## Repository Structure
 
@@ -49,8 +48,7 @@ open-wallet/
 │   ├── core/         # Wallet core: keys, vault encryption, session, chain abstraction
 │   ├── chains/       # Chain adapters (EVM / Solana / TRON)
 │   ├── ui/           # Shared UI components
-│   ├── shared/       # Shared types, utils, constants
-│   └── storage/      # Cross-platform encrypted storage abstraction
+│   └── shared/       # Shared types, utils, constants
 └── scripts/          # Dev utilities (e.g. EVM send-flow integration test)
 ```
 

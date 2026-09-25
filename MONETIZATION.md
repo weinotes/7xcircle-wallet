@@ -2,7 +2,7 @@
 
 > 单人开发者 · 零后端 · 全部第三方 API 分润 · 面向 MEME 交易者
 
-**文档版本:** v1.0 · 2026-09-24
+**文档版本:** v1.1 · 2026-09-25
 **适用阶段:** Alpha → 有稳定用户量的 1.0
 
 ---
@@ -58,7 +58,7 @@ Syndica 数据：2025 上半年 Solana DApp 收入 $1.6B，其中 **meme 类 DAp
 |---|---|---|---|---|---|
 | 1 | **Swap 兑换** | Jupiter（SOL）/ 0x（EVM） | 传抽成参数，手续费进 feeAccount | 中 | **P1** |
 | 2 | **Solana 质押** | Marinade Referral | 双方各得 +0.125% APY | 低 | **P1** |
-| 3 | **Tron 能量代付** | TronSave / Feee.io / MERX | 批发购入 + 加价转售 | 中 | **P1** |
+| 3 | **Tron 能量代付** | TronSave（自签名，无 Key） | sponsor 码 → 平台侧返佣（不加价；代理档 10–20%，需申请审批） | 中 | **P1** |
 | 4 | **多链质押** | Everstake / P2P.org / StakeKit | 佣金分成，可配置 | 低 | P2 |
 | 5 | **稳定币生息** | Yield.xyz / LI.FI Earn / Privy | 金库费率（10%/20%）或自设 bps | 低 | P2 |
 | 6 | **安全检测 / 新币发现** | 自建 + DexScreener | 不直接收费，是 Swap 收入的分母 | 高 | **P1** |
@@ -73,6 +73,8 @@ Syndica 数据：2025 上半年 Solana DApp 收入 $1.6B，其中 **meme 类 DAp
 ## 3. 收入线 1：Swap（主收入）
 
 ### 3.1 接入方案
+
+> **状态（2026-09-25）：已实现并已装 key。** Solana 走 Jupiter（`apps/web/src/pages/Swap.tsx`，`platformFeeBps` 已接线）；EVM 走 0x（`packages/chains/src/swap/zerox.ts`，支持 `swapFeeRecipient`/`swapFeeBps`，并含 7 条链的预设代币表）。**0x 的 CORS 是开放的**（实测返回 `Access-Control-Allow-Origin: *`），所以浏览器直连可以工作；真正的风险是 Vite 会把 `VITE_ZEROX_API_KEY` 内联进 bundle，任何人都能把 key 抽出来刷你的配额——因此直连仅限本地开发，生产应把 key 放在轻量网关里并用 `VITE_ZEROX_BASE_URL` 指过去。`VITE_SWAP_FEE_WALLET_EVM` 未配置时 EVM 侧抽成为 0。跨链 LI.FI 与 Tron SunSwap 未做。
 
 | 链 | 第三方 | 抽成参数 | 说明 |
 |---|---|---|---|
@@ -122,6 +124,8 @@ Syndica 数据：2025 上半年 Solana DApp 收入 $1.6B，其中 **meme 类 DAp
 
 ### 4.2 Solana 质押（建议第一个做）
 
+> **状态：已实现，但返佣链路暂停（2026-09-25）。** `packages/chains/src/staking/marinade.ts` 已完成路由获取与交易组装（含 referral code 参数注入），并有 10 项单元测试。但 `MARINADE_REFERRAL_ACTIVE` 现为 `false`：需要先在 Marinade 侧完成推荐计划签约并拿到真实 referral code，装上 `VITE_MARINADE_REFERRAL_CODE` 后才能产生收益。**当前 UI 未接此路径**——因为无推荐码时用户收益为零，为一个纯零收益入口增加代码路径不值得。等签约完成再接线。
+
 这是**唯一一个"用户多赚、我们也赚"**的结构，最适合作为迁移期的诚意卖点：
 
 - 用户质押 SOL（走 **Marinade Native**）→ 用户自己多得 0.125% APY
@@ -136,6 +140,8 @@ Syndica 数据：2025 上半年 Solana DApp 收入 $1.6B，其中 **meme 类 DAp
 > **对用户的说法**：「在我们这里质押 SOL，年化比别处高 0.125%，而且我们不加收任何费用。」——这是纯增量，TP 用户没有理由拒绝。
 
 ### 4.3 稳定币生息（被低估的第二曲线）
+
+> **状态（2026-09-25）：只做了"发现"，没做"存入"。** `packages/chains/src/yield/lifi.ts` 读取 LI.FI Earn Data API（keyless），`apps/web/src/pages/Earn.tsx` 渲染 USDC/USDT 高息金库卡片（APY / TVL / 30 日 APY），点击跳转协议官网。**不做程序化存入**：那需要 LI.FI Composer 的 key + 合约级集成，是这条线里最小的一块收入，不值得引入第二套集成。<br>**这意味着当前生息线上没有抽成收入入口**——卡片只是"让闲置资金可见"，为后续接入 Enso / Kiln 的费率参数铺路。
 
 **为什么对土狗用户有意义：** 他们不质押主流币（钱都在仓位里），但他们手上有**大量等待入场的 USDT 干粉**。这部分钱平时躺着，牛市回调时闲置数周。
 
@@ -157,6 +163,10 @@ BSC 没有真正意义上的原生质押，ETH 需要 32 ETH 或 LST，对这个
 
 ### 5.1 为什么这是被严重低估的一条线
 
+> **状态（2026-09-25）：已改为 TronSave 自签名（非托管）链路，零配置即可用。** `packages/chains/src/tron/tronsave.ts` 是 TronSave v2 客户端：`/v2/estimate-buy-resource` **无需任何密钥**即可报价，`/v2/buy-resource` 由买家签好的 TRX 转账本身完成鉴权，`/v2/order/:id` 轮询委托进度。`TronAdapter.estimateResources` 算出真实能量缺口，`Send.tsx` 在 TRC20 转账时显示「燃烧 vs 租用」对比，并可就地完成一次租赁（报价 → 本地签名 → 下单 → 轮询到账）。**这条链路不需要 API Key、不需要预充值、不需要后端**；无报价时静默降级为只显示燃烧成本。浏览器直连可行（`api.tronsave.io` 返回 `Access-Control-Allow-Origin: *`，2026-09 实测含 POST 预检）。
+>
+> ⚠️ **不使用 TronSave 的 API Key 通道**：它从托管的内部余额扣款（本账户余额为 0，且下单还需先充值 ≥ 10 TRX），其文档也要求服务端调用 —— 与本钱包「非托管 + 零后端」的前提直接冲突。`/v2/signed-tx`（要买家私钥）同样不接入。
+
 Tron 的资源模型（Stake 2.0）决定了两件事：
 
 - 普通 TRC20 USDT 转账 **燃烧 TRX ≈ $0.5–3**
@@ -165,42 +175,61 @@ Tron 的资源模型（Stake 2.0）决定了两件事：
 
 TP 用户**本来就懂能量**，这是最容易被理解、最容易推销的卖点。
 
-### 5.2 商业模式：批发购入 → 加价转售
+### 5.2 商业模式：不加价，赚平台侧返佣
 
-我们**不自建能量池**，而是：
+我们**不自建能量池**，也**不在市场价上加价**：
 
-1. 通过第三方 API 批发购入能量
-2. 在用户转账时自动代付
-3. 向用户收取**低于燃烧成本**的费用
+1. 用 TronSave 的**公开报价**给用户报价（`/v2/estimate-buy-resource`，无需密钥）
+2. 用户在钱包内**本地签名**一笔 TRX 转账，直接付给 TronSave 的收款地址（资金不经我们）
+3. 订单携带我们的 **sponsor 码**，TronSave 在平台侧按订单总额返佣
 
-用户省钱 → 我们赚差价 → 双赢。
+用户按**市场价**付费、零加价；我们的收入来自 TronSave 的返佣，而非用户差价。
+
+> **返佣率与获取方式（TronSave 官方口径自相矛盾，以实际批复为准）**
+> - 官方 FAQ「Agency Program」：新代理档 **10–20%**，按量级分档，高量可谈
+> - 官方文档「Referral Program」：**5%**，TRX 结算，每周一发放，最低打款 10 TRX
+> - 入口是 **Agency 板块**（不叫 "Referral"），且**不是自助生成**：连接钱包后
+>   需**提交申请并等待审批**，通过后才拿到 code 与 agency 后台
+> - API 的 `sponsor` 字段已按官方 create-order 文档接入；**该字段能否用于 API 订单，
+>   需在拿到 code 后实测确认**（FAQ 只描述了网页端口径）
+
+> **为什么不做"批发 + 加价"**：加价的前提是我们先自持能量（自建池，或充值 TronSave 的
+> 托管内部余额再转售）。前者要质押本金，后者要托管资金 —— 两者都与"非托管 + 零后端"
+> 前提冲突。返佣模式让同一笔订单在**不碰资金、不加用户成本**的前提下产生收入，
+> 是本钱包唯一可行的能量变现方式。
 
 ### 5.3 第三方 API 选型
 
 | 供应商 | 类型 | API | 说明 |
 |---|---|---|---|
-| **TronSave** | 直接供应商 | `https://api.tronsave.io`（v2，API Key 认证） | 最早的能量租赁服务之一。接口：`/v2/estimate-buy-resource`、`/v2/buy-resource`、`/v2/user-info`、`/v2/order/:id`、`/v2/orders`、`/v2/order-book`、`/v2/get-extendable-delegates`、`extendRequest`。官方 SDK **`@tronsave/sdk`**（TypeScript，零依赖，内置重试与限流） |
+| **TronSave** | 直接供应商 | `https://api.tronsave.io`（v2） | 最早的能量租赁服务之一。**已接入**：`/v2/estimate-buy-resource`（公开，无密钥）、`/v2/buy-resource`（凭已签名的 TRX 转账鉴权）、`/v2/order/:id`（查单）。其余接口 `user-info` / `orders` / `order-book` / `get-extendable-delegates` 属 Key 通道，未接入 |
 | **Feee.io** | 直接供应商 | 有 API | 定价有竞争力，已被多个下游项目集成 |
-| **MERX** | **聚合层** | 单一 API | 聚合所有供应商。每 30 秒轮询报价，Redis 缓存 TTL 60 秒，自动路由到最便宜且有货的供应商，支持故障转移。**消除"集成税"**（自接每家约 5–7 天） |
+| **MERX** | 聚合层 | 单一 API | 聚合所有供应商。每 30 秒轮询报价，Redis 缓存 TTL 60 秒，自动路由到最便宜且有货的供应商，支持故障转移。**消除"集成税"**（自接每家约 5–7 天）。⚠️ 走 Key + 托管余额，需要后端，本钱包暂不适用 |
 | TronScan.energy | 聚合层 | API 集成中 | 聚合 19+ 家供应商 |
 
 > **注意参数约束：** TronSave 要求 ENERGY 的 `resourceAmount > 64,000`，默认 `durationSec = 259200`（3 天）。
 
-> **推荐路径：** 先用 **MERX 聚合 API** 单点接入（避免逐家集成），量大后再直连 **TronSave / Feee.io** 拿更好的批发价。
+> **已选路径：** 直连 **TronSave 自签名通道**。聚合层（MERX / TronScan.energy）都要 Key + 托管余额 + 后端代持，与本钱包的非托管前提冲突；等出现「非托管聚合器」再评估。备选直连 **Feee.io**。
 
 ### 5.4 定价示例
 
 | 项目 | 金额 |
 |---|---|
-| 用户直接燃烧 TRX | ~$1.50 / 笔 |
-| 我们批发能量成本 | ~$0.40 / 笔 |
-| 向用户收取 | **$0.70 / 笔** |
-| 用户节省 | 53% |
-| **我们毛利** | **$0.30 / 笔** |
+| 用户直接燃烧 TRX（无能量时的 TRC20 转账） | ~14 TRX / 笔 |
+| 经 TronSave 租赁（用户自付，市场价，实测 SLOW 档） | ~8.385 TRX / 笔（65k 能量 / 3 天） |
+| 用户节省 | ~40% |
+| **我们的收入（TronSave 返佣，费率待批复）** | **~0.42 TRX / 笔 @5%（@10–20% 则 ~0.84–1.68 TRX）** |
 
-**收入量级：** 1,000 活跃用户 × 30 笔/月 × $0.30 = **$9,000/月 ≈ $10.8 万/年**
+**收入量级（以 TRX 计）：** 1,000 活跃用户 × 30 笔/月 × 0.42 TRX = **~12,600 TRX/月 ≈ ~15.1 万 TRX/年**
 
-（这是乐观值。建议按你真实用户数代入：`用户数 × 月均笔数 × $0.30`。）
+> ⚠️ **与旧版模型的量级差异**：旧版按"批发购入 + 加价转售"估 `$0.30/笔` 毛利。
+> 自签名通道下我们**无法加价**（用户直接按市场价付给 TronSave），实际收入只有平台
+> 返佣，按 5% 口径**比旧估值低约一个量级**（若批复到 Agency 的 10–20% 则差距收窄）。
+> 请按真实 TRX 价格代入：
+> `用户数 × 月均笔数 × 单笔订单额 × 批复费率`（单笔订单约 8.385 TRX）。
+>
+> 若要更高毛利，唯一路径是成为 TronSave **Provider**（需质押 ≥5,000 TRX，
+> 解押等待期 14 天，官方口径 APY ~18%）—— 那是资金生意，不是零后端生意。
 
 ---
 
@@ -274,7 +303,7 @@ export type TxIntent =
 
 ### 8.3 Phase 2：Tron 支持（迁移的入场券）
 
-**现状：`packages/chains/src/configs.ts` 里 9 条链，一条 Tron 都没有。TP 用户的钱在 TRC20 USDT 上，进不来。**
+**现状（2026-09-25 更新）：已落地。** `packages/chains/src/configs.ts` 现含 11 条链（新增 `tron-227` / `tron-nile`），`packages/chains/src/tron/` 下 adapter / address / tx / protobuf / energy 全套模块齐备，`TronAdapter` 支持余额、TRC20 收发、能量估算与代付下单。剩余待做：SunSwap 兑换、Stake 2.0 冻结、TronGrid API key 接线（`TronAdapter.setGridApiKey` 已就绪，但尚未接入 `apps/web/src/config.ts`，因此 TRC20 交易历史暂不可用）。
 
 **技术要点：**
 
@@ -294,11 +323,11 @@ export type TxIntent =
 
 | 问题 | 位置 |
 |---|---|
-| `packages/storage` 是死代码，无人 import | 要么接入，要么删除 |
+| ~~`packages/storage` 是死代码，无人 import~~ | **已删除**（各端已各自实现持久化：Web = zustand/localStorage、Mobile = SecureStore/AsyncStorage、Extension = chrome.storage） |
 | README 声称支持 Bitcoin，**实际没有 adapter** | 修文档（这是信任问题） |
 | `estimateFees` 永远返回 `level: 'medium'` | 补慢/快/自定义档位 |
 | 扩展 provider 是空壳（`eth_accounts` 恒返回 `[]`） | 除非用户真在浏览器用 dApp，否则**低优先**；完成度不够的 provider 反而是安全隐患 |
-| 无 lint 配置 | `turbo.json` 有 `lint` 任务但没有包定义脚本 |
+| ~~无 lint 配置~~ | **已修复**：根 `eslint.config.mjs`（flat config）+ 各包 `lint` 脚本，`pnpm lint` 通过 |
 
 ---
 
@@ -312,12 +341,20 @@ export type TxIntent =
 | 1,000 | $8.7M | $34.7k | **~$41.6 万** |
 | 3,000 | $26M | $104k | **~$125 万** |
 
-### 9.2 Tron 能量（$0.30 毛利/笔，人均 30 笔/月）
+### 9.2 Tron 能量（人均 30 笔/月，返佣率取决于批复档位）
 
-| 活跃用户 | 年收入 |
-|---|---|
-| 500 | ~$5.4 万 |
-| 1,000 | ~$10.8 万 |
+单笔返佣 = 订单额 ~8.385 TRX × 费率。官方两个口径冲突，故按 5% / 10% / 20% 三档并列：
+
+| 活跃用户 | 年订单量 | @5%（~0.42 TRX/笔） | @10%（~0.84 TRX/笔） | @20%（~1.68 TRX/笔） |
+|---|---|---|---|---|
+| 500 | 18 万 | ~7.6 万 TRX（~$8.3k） | ~15.1 万 TRX（~$16.6k） | ~30.2 万 TRX（~$33.3k） |
+| 1,000 | 36 万 | ~15.1 万 TRX（~$16.6k） | ~30.2 万 TRX（~$33.3k） | ~60.5 万 TRX（~$66.5k） |
+
+（$ 按 TRX $0.11 估）
+
+> 见 §5.4：自签名通道下我们不加价，收入仅为平台侧返佣，旧版 `$0.30/笔` 的假设已不成立。
+> 实际落哪一档取决于 5%（Referral Program 文档）与 10–20%（FAQ 的 Agency Program）
+> 孰为准，需拿到 code 后按批复核对。
 
 ### 9.3 质押与生息
 
@@ -345,7 +382,7 @@ export type TxIntent =
 |---|---|---|
 | **合规（MiCA）** | 2026-07-01 全面执行。非托管钱包本身**不在 CASP 范围**，但"收手续费是否触发持牌"在欧盟各成员国解释不一致 | ① 费率抽在**第三方聚合器参数里**（我们身份是推荐方，不是自营路由）；② 确认页**显式披露费用**；③ 费率可配置、可归零；④ 手续费代币**直接进 feeAccount**，我们不托管 |
 | **行情周期性** | Swap 收入与土狗行情强正相关，熊市腰斩 | 靠能量（刚需）+ 生息（反周期）对冲；保持零后端成本结构 |
-| **第三方依赖** | 所有收入线都依赖第三方 API | 每家都准备备选（Tron 用 MERX 聚合天然多供应商；质押用 StakeKit 聚合） |
+| **第三方依赖** | 所有收入线都依赖第三方 API | 每家都准备备选（Tron 能量备选 Feee.io；质押用 StakeKit 聚合） |
 | **品牌风险** | 收"涨价"费会伤害社区信任 | 迁移期把费率理由立住；优先用"用户也获益"的结构（如 Marinade 双方各得 0.125%） |
 | **单人开发** | 最大风险是摊子铺太大 | 严格按优先级执行，不并行铺开 |
 
@@ -368,13 +405,13 @@ Phase 1 ── Solana 交易基建（P0，用户留存的生死线）
 └── 接付费快速 RPC（Helius / Triton）
 
 Phase 2 ── Tron MVP（迁移入场券）
-├── 地址派生 + TronGrid RPC + protobuf 交易
-├── TRC20 USDT 收发
-└── 能量代付（MERX 聚合 API）+ 分润
+├── 地址派生 + TronGrid RPC + protobuf 交易   ✓ 已落地
+├── TRC20 USDT 收发                          ✓ 已落地
+└── 能量代付（TronSave 自签名，无 Key）      ✓ 报价 + 下单/付款链路已接（sponsor 返佣码待配置；真金白银验证待主网测试）
 
 Phase 3 ── 第一条收入
-├── Solana Swap（Jupiter platformFeeBps：基础 0.2% / 极速 0.5%）
-└── Solana 质押（Marinade Referral）
+├── Solana Swap（Jupiter platformFeeBps：基础 0.2% / 极速 0.5%）  ✓ 已落地
+└── Solana 质押（Marinade Referral）                             ⏸ 路由已写，返佣暂停
 
 Phase 4 ── 留存引擎（Swap 收入的分母）
 ├── 貔貅/rug 检测
@@ -382,11 +419,11 @@ Phase 4 ── 留存引擎（Swap 收入的分母）
 └── 新币自动发现
 
 Phase 5 ── 扩展
-├── BSC Swap（0x Swap API）
-├── 稳定币生息（Yield.xyz OAV / LI.FI Earn）
+├── BSC Swap（0x Swap API）                  ✓ 已落地（7 条 EVM 链，需 key + 代理）
+├── 稳定币生息（Yield.xyz OAV / LI.FI Earn）  △ 仅金库发现，无存入
 ├── 多链质押（StakeKit / Everstake）
 ├── 授权管理 / 一键撤销
-└── ETH Swap
+└── ETH Swap                                 ✓ 已落地（随 0x 一并支持）
 
 Phase 6 ── 可选
 └── 扩展 provider 完整化（EIP-6963 + eth_sendTransaction + WalletConnect）
@@ -424,7 +461,7 @@ Phase 6 ── 可选
 | 多链质押 | StakeKit / Everstake / P2P.org | 佣金分成，可配置；Everstake ~1 天，P2P.org 72 小时 |
 | 稳定币生息 | Yield.xyz OAV | `POST /v1/actions/enter`，预置 10% / 20% 费率金库 |
 | 稳定币生息 | LI.FI Earn / Enso / Kiln DeFi / Privy | Enso 传 `fee`(bps) + `feeReceiver`；Privy 最高捕获 50% 收益 |
-| Tron 能量 | TronSave / Feee.io / MERX | TronSave `@tronsave/sdk`，`/v2/buy-resource`；MERX 聚合多供应商 |
+| Tron 能量 | TronSave（已接入）/ Feee.io / MERX | TronSave 自签名通道：`/v2/estimate-buy-resource` + `/v2/buy-resource`（订单带 `sponsor` 码，平台侧返佣 5%，Agency 档 10–20%，需申请审批），无需 Key；MERX 等聚合层需托管余额，暂不适用 |
 | 价格数据 | Jupiter Price API / DexScreener | 覆盖土狗，CoinGecko 覆盖不到 |
 
 ## 附录 B：关键代码位置
@@ -433,12 +470,17 @@ Phase 6 ── 可选
 |---|---|
 | 链适配器接口 | `packages/core/src/chain/adapter.ts` |
 | 跨链统一类型 | `packages/shared/src/types.ts` |
-| 链配置（9 条链，无 Tron） | `packages/chains/src/configs.ts` |
+| 链配置（11 条链，含 Tron） | `packages/chains/src/configs.ts` |
 | Solana adapter（字符串 DSL 所在） | `packages/chains/src/solana/adapter.ts` |
 | EVM adapter（已有 `encodeFunctionData`） | `packages/chains/src/evm/adapter.ts` |
-| 唯一完整发送流程 | `apps/web/src/pages/Send.tsx`（1,019 行） |
+| Tron adapter / 能量代付 | `packages/chains/src/tron/adapter.ts`、`packages/chains/src/tron/tronsave.ts` |
+| 0x Swap 客户端 + EVM 代币表 | `packages/chains/src/swap/zerox.ts` |
+| LI.FI Earn 金库发现 | `packages/chains/src/yield/lifi.ts` |
+| Marinade 质押路由（返佣暂停） | `packages/chains/src/staking/marinade.ts` |
+| web 端密钥/端点接线 | `apps/web/src/config.ts` |
+| 唯一完整发送流程 | `apps/web/src/pages/Send.tsx` |
 | 扩展 provider 空壳 | `apps/extension/src/content.ts`、`apps/extension/public/inpage.js` |
 
 ---
 
-*文档版本：v1.0 · 2026-09-24 · Apache-2.0*
+*文档版本：v1.1 · 2026-09-25 · Apache-2.0*
