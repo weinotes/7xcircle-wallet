@@ -50,7 +50,9 @@ import {
   estimateBuyResource,
   fetchResourceOrder,
   fundAddressFor,
+  isEnsName,
   planResourcePurchase,
+  resolveEnsName,
   type ResourceEstimate,
   type ResourceOrder,
   type SignedTxPayload,
@@ -133,6 +135,10 @@ export function Send() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [tokenMode, setTokenMode] = useState<TokenMode>('native');
+  // Recipient: the typed text (may be an ENS name) and the RESOLVED address
+  // every downstream step — validation, fees, signing — exclusively uses.
+  const [recipientInput, setRecipientInput] = useState('');
+  const [ensStage, setEnsStage] = useState<'none' | 'resolving' | 'resolved' | 'unresolved'>('none');
   const [toAddress, setToAddress] = useState('');
   const [amount, setAmount] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
@@ -191,6 +197,36 @@ export function Send() {
 
   // Build → sign → broadcast → confirm, including Solana blockhash retry
   const flow = useTxFlow({ adapter, account: fromAccount, chainId: activeChainId, feeTier });
+
+  // ── ENS name → address (EVM chains only, debounced) ──
+  // Every downstream step consumes `toAddress`; it stays EMPTY until a name
+  // resolves, so an un-deadlined .eth can never reach the sign path.
+  useEffect(() => {
+    const typed = recipientInput.trim();
+    if (activeChain?.type !== 'evm' || !isEnsName(typed)) {
+      // A plain address (or a non-EVM chain): typed text IS the address
+      setToAddress(typed);
+      setEnsStage('none');
+      return;
+    }
+    setEnsStage('resolving');
+    setToAddress('');
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      resolveEnsName(typed)
+        .then(addr => {
+          if (cancelled) return;
+          if (addr) {
+            setToAddress(addr);
+            setEnsStage('resolved');
+          } else {
+            setEnsStage('unresolved');
+          }
+        })
+        .catch(() => { if (!cancelled) setEnsStage('unresolved'); });
+    }, 350);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [recipientInput, activeChain?.type]);
 
   /**
    * A single status for the UI to render. The transaction phase wins once it
@@ -1055,12 +1091,34 @@ export function Send() {
       <Input
         label={t('send.recipientLabel')}
         placeholder={t('send.recipientPlaceholder')}
-        value={toAddress}
-        onChange={e => setToAddress(e.target.value)}
-        error={toAddress && adapter && !adapter.validateAddress(toAddress)
-          ? t('send.invalidAddress')
-          : undefined}
+        value={recipientInput}
+        onChange={e => setRecipientInput(e.target.value)}
+        error={
+          ensStage === 'unresolved'
+            ? t('send.unresolvedName', { name: recipientInput.trim() })
+            : recipientInput && toAddress && adapter && !adapter.validateAddress(toAddress)
+              ? t('send.invalidAddress')
+              : undefined
+        }
+        hint={ensStage === 'resolving' ? t('send.resolvingName') : undefined}
       />
+      {ensStage === 'resolved' && (
+        <div
+          style={{
+            display: 'flex',
+            gap: 'var(--ow-space-2)',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            marginTop: 'calc(-1 * var(--ow-space-2))',
+            fontSize: 'var(--ow-font-size-xs)',
+            color: 'var(--ow-positive-fg)',
+          }}
+        >
+          <CheckCircle2 size={13} aria-hidden="true" />
+          <span>{recipientInput.trim()} →</span>
+          <span className="ow-mono" style={{ wordBreak: 'break-all' }}>{toAddress}</span>
+        </div>
+      )}
 
       {/* ── Amount + Max ─────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 'var(--ow-space-2)', alignItems: 'flex-end' }}>
@@ -1320,6 +1378,11 @@ export function Send() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--ow-space-3)' }}>
           <div>
             <strong>{t('send.to')}</strong>{' '}
+            {ensStage === 'resolved' && (
+              <div style={{ fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-text-secondary)', marginBottom: 2 }}>
+                {recipientInput.trim()} →
+              </div>
+            )}
             <code style={{ wordBreak: 'break-all' }}>{toAddress}</code>
           </div>
           <div>

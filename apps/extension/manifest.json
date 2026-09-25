@@ -20,15 +20,25 @@
   },
   "content_scripts": [
     {
-      "matches": ["http://*/*", "https://*/*"],
-      "js": ["content.js"],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_start"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["inpage.js"],
-      "matches": ["http://*/*", "https://*/*"]
+      "resources": [
+        "inpage.js"
+      ],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ]
     }
   ],
   "icons": {
@@ -37,7 +47,10 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "permissions": ["storage", "usb"],
+  "permissions": [
+    "storage",
+    "usb"
+  ],
   "host_permissions": [
     "https://lite-api.jup.ag/*",
     "https://yields.llama.fi/*",
@@ -59,7 +72,9 @@
     "https://*.binance.org/*",
     "https://api.mainnet-beta.solana.com/*",
     "https://api.devnet.solana.com/*",
-    "https://*.solana.com/*"
+    "https://*.solana.com/*",
+    "https://rpc.ankr.com/*",
+    "https://cloudflare-eth.com/*"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"

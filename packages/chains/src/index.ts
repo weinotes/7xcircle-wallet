@@ -27,6 +27,7 @@ export * from './staking/marinade.js';
 export * from './swap/zerox.js';
 export * from './security/tokenscan.js';
 export * from './security/solana.js';
+export * from './naming/ens.js';
 export * from './pricing/price.js';
 export * from './yield/lifi.js';
 
