@@ -23,7 +23,7 @@
     "@walletconnect/types": "^2.25.0",
     "expo": "~53.0.0",
     "expo-camera": "~16.1.11",
-    "expo-constants": "~17.1.8",
+    "expo-constants": "~57.0.19",
     "expo-local-authentication": "~16.0.5",
     "expo-secure-store": "~14.2.3",
     "expo-status-bar": "~2.2.3",
