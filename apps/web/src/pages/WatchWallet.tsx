@@ -259,7 +259,7 @@ export function WatchWallet() {
                     </span>
                   </div>
                   <button
-                    onClick={() => removeWatchAddress(entry.address)}
+                    onClick={() => removeWatchAddress(entry.chainId, entry.address)}
                     style={{
                       background: 'none',
                       border: 'none',

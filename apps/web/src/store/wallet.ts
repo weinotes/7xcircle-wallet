@@ -111,8 +111,8 @@ export interface WalletState {
 
   /** Add a watch-only address (no key, read-only monitoring) */
   addWatchAddress: (entry: WatchEntry) => void;
-  /** Remove a watch-only address */
-  removeWatchAddress: (address: string) => void;
+  /** Remove a watch-only address on ONE chain — the same address may be watched on several chains */
+  removeWatchAddress: (chainId: string, address: string) => void;
 }
 
 /** A watched address — public info only, no key material */
@@ -269,8 +269,8 @@ export const useWalletStore = create<WalletState>()(
         }
         return { watchAddresses: [...state.watchAddresses, entry] };
       }),
-      removeWatchAddress: (address) => set(state => ({
-        watchAddresses: state.watchAddresses.filter(w => w.address !== address),
+      removeWatchAddress: (chainId, address) => set(state => ({
+        watchAddresses: state.watchAddresses.filter(w => !(w.address === address && w.chainId === chainId)),
       })),
     }),
     {

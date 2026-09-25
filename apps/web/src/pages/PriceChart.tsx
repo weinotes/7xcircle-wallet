@@ -64,21 +64,30 @@ export function PriceChart({ chainId, tokenAddress, tokenSymbol, isNative, onClo
     setLoading(true);
 
     (async () => {
-      const tf = TIMEFRAMES[tfIndex];
-      const data = await fetchOhlcv(chainId, lookupAddress, tf.tf, tf.aggregate, tf.limit);
-      if (cancelled) return;
+      try {
+        const tf = TIMEFRAMES[tfIndex];
+        const data = await fetchOhlcv(chainId, lookupAddress, tf.tf, tf.aggregate, tf.limit);
+        if (cancelled) return;
 
-      setCandles(data);
+        setCandles(data);
 
-      // Fallback to DexScreener spot when GeckoTerminal has no data
-      if (data.length === 0) {
-        const spotData = await fetchDexScreenerSpot(lookupAddress);
-        if (!cancelled) setSpot(spotData);
-      } else {
-        setSpot(null);
+        // Fallback to DexScreener spot when GeckoTerminal has no data
+        if (data.length === 0) {
+          const spotData = await fetchDexScreenerSpot(chainId, lookupAddress);
+          if (!cancelled) setSpot(spotData);
+        } else {
+          setSpot(null);
+        }
+      } catch {
+        // Both fetchers degrade internally — this is the last-resort guard so
+        // an unexpected rejection can never strand the drawer on "loading".
+        if (!cancelled) {
+          setCandles([]);
+          setSpot(null);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-
-      if (!cancelled) setLoading(false);
     })();
 
     return () => { cancelled = true; };
