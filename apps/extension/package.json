@@ -17,13 +17,13 @@
     "@7xcircle/shared": "workspace:*",
     "@7xcircle/ui": "workspace:*",
     "buffer": "^6.0.3",
-    "i18next": "^26.4.0",
+    "i18next": "^26.4.2",
     "lucide-react": "^0.460.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-i18next": "^17.0.12",
-    "react-router-dom": "^7.0.0",
+    "react-i18next": "^17.0.15",
+    "react-router-dom": "^7.18.4",
     "zustand": "^5.0.0"
   },
   "devDependencies": {
