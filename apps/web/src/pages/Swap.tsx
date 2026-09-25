@@ -57,7 +57,7 @@ import {
 } from '@7xcircle/chains';
 import { formatBalance, parseAmount } from '@7xcircle/shared';
 import type { TxIntent } from '@7xcircle/shared';
-import { useWalletStore } from '../store/wallet.js';
+import { useWalletStore, selectActiveAccount } from '../store/wallet.js';
 import { useTxFlow } from '../hooks/useTxFlow.js';
 import {
   SWAP_FEE_BPS,
@@ -145,7 +145,7 @@ export function Swap() {
   const active = chainOptions.find(o => o.chainId === chainId) ?? chainOptions[0];
   const activeChainId = active?.chainId ?? '';
 
-  const account = accounts.find(a => a.chainId === activeChainId);
+  const account = useWalletStore(selectActiveAccount);
   const adapter = chainRegistry.get(activeChainId);
   const flow = useTxFlow({ adapter, account, chainId: activeChainId, feeTier: 'fast' });
 

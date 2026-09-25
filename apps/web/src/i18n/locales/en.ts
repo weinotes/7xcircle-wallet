@@ -116,6 +116,7 @@ export default {
     copyAddress: 'Copy address',
     sendTokenAria: 'Send {{symbol}}',
     actionsLabel: 'Quick actions',
+    addAccount: '+ Add account',
     loadDataIssue: 'Some data failed to load ({{error}}); showing a reduced view — tap refresh to retry',
   },
 

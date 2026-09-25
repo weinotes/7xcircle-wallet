@@ -30,7 +30,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ArrowUpRight, ArrowDownRight, Clock, CheckCircle2, XCircle, RefreshCw, ExternalLink, Inbox, Zap, Ban } from 'lucide-react';
 import { Button, IconButton, Card, Skeleton, EmptyState, Modal } from '@7xcircle/ui';
-import { useWalletStore } from '../store/wallet.js';
+import { useWalletStore, selectActiveAccount } from '../store/wallet.js';
 import { CHAIN_CONFIGS } from '@7xcircle/chains';
 import { useTransactionHistory } from '../hooks/useTransactionHistory.js';
 import { useTxFlow } from '../hooks/useTxFlow.js';
@@ -101,9 +101,8 @@ export function History() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const activeChainId = useWalletStore(s => s.activeChainId);
-  const accounts = useWalletStore(s => s.accounts);
   const removePendingTx = useWalletStore(s => s.removePendingTx);
-  const fromAccount = accounts.find(a => a.chainId === activeChainId);
+  const fromAccount = useWalletStore(selectActiveAccount);
   const activeChain = CHAIN_CONFIGS.find(c => c.chainId === activeChainId);
   const adapter = chainRegistry.get(activeChainId);
 

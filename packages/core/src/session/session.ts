@@ -96,15 +96,20 @@ function mnemonicToBytes(mnemonic: string): Uint8Array {
   return new TextEncoder().encode(mnemonic);
 }
 
-// ─── Account derivation ───────────────────────────────────────────────
+// ─── Account derivation ───────────────────────────────────────────
+
+/** Ceiling on HD accounts per chain — generous, and keeps unlock bounded */
+const MAX_ACCOUNTS_PER_CHAIN = 10;
 
 /**
- * Derive one account per registered chain from the mnemonic.
- * Uses each chain's configured BIP44 path + accountIndex.
+ * Derive accounts per registered chain from the mnemonic.
+ * Uses each chain's configured BIP44 path; `accountCounts[chainId]`
+ * derives that many consecutive indexes (default one account per chain).
  */
 function deriveAllAccounts(
   mnemonic: string,
   chainConfigs: ChainConfig[],
+  accountCounts: Record<string, number> = {},
 ): Account[] {
   const accounts: Account[] = [];
 
@@ -116,44 +121,48 @@ function deriveAllAccounts(
       continue;
     }
 
-    const accountIndex = 0; // first account per chain
+    // How many consecutive accounts this chain carries (default 1)
+    const count = Math.max(1, Math.min(accountCounts[config.chainId] ?? 1, MAX_ACCOUNTS_PER_CHAIN));
     // ed25519 (Solana/SLIP-0010) requires ALL-hardened derivation,
     // so accountIndex must also be hardened (e.g. m/44'/501'/0'/0')
     const isEd25519 = config.type === 'solana';
-    const derivationPath = isEd25519
-      ? `${config.bip44Path}/${accountIndex}'`
-      : `${config.bip44Path}/${accountIndex}`;
 
-    let privateKey: Uint8Array;
-    let publicKey: Uint8Array;
+    for (let accountIndex = 0; accountIndex < count; accountIndex++) {
+      const derivationPath = isEd25519
+        ? `${config.bip44Path}/${accountIndex}'`
+        : `${config.bip44Path}/${accountIndex}`;
 
-    if (config.type === 'evm' || config.type === 'tron') {
-      // Tron is secp256k1/BIP32 exactly like EVM — only the path (m/44'/195')
-      // and the address encoding differ (handled by the chain adapter)
-      privateKey = deriveEvmPrivateKey(mnemonic, derivationPath);
-      publicKey = evmPublicKey(privateKey);
-    } else if (config.type === 'solana') {
-      privateKey = deriveSolanaPrivateKey(mnemonic, derivationPath);
-      publicKey = solanaPublicKey(privateKey);
-    } else {
-      continue; // unsupported chain type
+      let privateKey: Uint8Array;
+      let publicKey: Uint8Array;
+
+      if (config.type === 'evm' || config.type === 'tron') {
+        // Tron is secp256k1/BIP32 exactly like EVM — only the path (m/44'/195')
+        // and the address encoding differ (handled by the chain adapter)
+        privateKey = deriveEvmPrivateKey(mnemonic, derivationPath);
+        publicKey = evmPublicKey(privateKey);
+      } else if (config.type === 'solana') {
+        privateKey = deriveSolanaPrivateKey(mnemonic, derivationPath);
+        publicKey = solanaPublicKey(privateKey);
+      } else {
+        continue; // unsupported chain type
+      }
+
+      const address = adapter.deriveAddress(publicKey, accountIndex);
+
+      accounts.push({
+        id: generateId(),
+        chainId: config.chainId,
+        address,
+        publicKey: publicKey.reduce((s, b) => s + b.toString(16).padStart(2, '0'), ''),
+        derivationPath,
+        accountIndex,
+        nickname: count > 1 ? `${config.name} #${accountIndex + 1}` : config.name,
+        createdAt: Date.now(),
+      });
+
+      // Best-effort wipe of the ephemeral privateKey from this scope
+      wipeBytes(privateKey);
     }
-
-    const address = adapter.deriveAddress(publicKey, accountIndex);
-
-    accounts.push({
-      id: generateId(),
-      chainId: config.chainId,
-      address,
-      publicKey: publicKey.reduce((s, b) => s + b.toString(16).padStart(2, '0'), ''),
-      derivationPath,
-      accountIndex,
-      nickname: config.name,
-      createdAt: Date.now(),
-    });
-
-    // Best-effort wipe of the ephemeral privateKey from this scope
-    wipeBytes(privateKey);
   }
 
   return accounts;
@@ -218,12 +227,13 @@ export async function unlock(
   vault: VaultData,
   password: string,
   chainConfigs: ChainConfig[],
+  accountCounts: Record<string, number> = {},
 ): Promise<Account[]> {
   const plaintext = await decryptVault(vault, password);
   const secret = decodeVaultSecret(plaintext);
 
   if (secret.kind === 'mnemonic') {
-    const accounts = deriveAllAccounts(secret.mnemonic, chainConfigs);
+    const accounts = deriveAllAccounts(secret.mnemonic, chainConfigs, accountCounts);
     const bytes = mnemonicToBytes(secret.mnemonic);
     state = {
       unlocked: true,
@@ -312,6 +322,64 @@ export function getPrivateKey(account: Account): Uint8Array {
   }
 
   throw new Error(`Unsupported chain type: ${config.type}`);
+}
+
+/**
+ * Derive the NEXT HD account for a chain (MetaMask-style "add account").
+ * The account is appended to the live session and returned; the caller
+ * persists the chain's account COUNT so unlock() re-derives it next time.
+ *
+ * Only mnemonic sessions support this — an imported-key vault has no
+ * key tree to walk, and hardware accounts come from the device.
+ */
+export function deriveMoreAccount(chainId: string): Account {
+  if (!state.unlocked || !state.mnemonicBytes) {
+    throw new Error('Wallet is locked');
+  }
+  const config = chainRegistry.get(chainId)?.config;
+  if (!config) {
+    throw new Error(`No chain config for ${chainId}`);
+  }
+
+  const existing = state.accounts.filter(a => a.chainId === chainId && a.source !== 'key');
+  const nextIndex = existing.reduce((max, a) => Math.max(max, a.accountIndex + 1), 0);
+  if (nextIndex >= MAX_ACCOUNTS_PER_CHAIN) {
+    throw new Error(`At most ${MAX_ACCOUNTS_PER_CHAIN} accounts per chain`);
+  }
+
+  touchActivity();
+  const mnemonic = mnemonicFromBytes(state.mnemonicBytes);
+  const isEd25519 = config.type === 'solana';
+  const derivationPath = isEd25519
+    ? `${config.bip44Path}/${nextIndex}'`
+    : `${config.bip44Path}/${nextIndex}`;
+
+  let privateKey: Uint8Array;
+  let publicKey: Uint8Array;
+  if (config.type === 'evm' || config.type === 'tron') {
+    privateKey = deriveEvmPrivateKey(mnemonic, derivationPath);
+    publicKey = evmPublicKey(privateKey);
+  } else if (config.type === 'solana') {
+    privateKey = deriveSolanaPrivateKey(mnemonic, derivationPath);
+    publicKey = solanaPublicKey(privateKey);
+  } else {
+    throw new Error(`Unsupported chain type: ${config.type}`);
+  }
+
+  const adapter = chainRegistry.get(chainId)!;
+  const account: Account = {
+    id: generateId(),
+    chainId,
+    address: adapter.deriveAddress(publicKey, nextIndex),
+    publicKey: publicKey.reduce((s, b) => s + b.toString(16).padStart(2, '0'), ''),
+    derivationPath,
+    accountIndex: nextIndex,
+    nickname: `${config.name} #${nextIndex + 1}`,
+    createdAt: Date.now(),
+  };
+  wipeBytes(privateKey);
+  state.accounts.push(account);
+  return account;
 }
 
 // ─── Export helpers (password-gated reveals) ───────────────────

@@ -29,7 +29,7 @@ import { ArrowLeft, Copy, Check, QrCode } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Card, IconButton, EmptyState } from '@7xcircle/ui';
-import { useWalletStore } from '../store/wallet.js';
+import { useWalletStore, selectActiveAccount } from '../store/wallet.js';
 import { CHAIN_CONFIGS } from '@7xcircle/chains';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -38,7 +38,7 @@ export function Receive() {
   const navigate = useNavigate();
   const activeChainId = useWalletStore(s => s.activeChainId);
   const accounts = useWalletStore(s => s.accounts);
-  const account = accounts.find(a => a.chainId === activeChainId) ?? accounts[0];
+  const account = useWalletStore(selectActiveAccount) ?? accounts[0];
   const activeChain = CHAIN_CONFIGS.find(c => c.chainId === activeChainId);
   const [copied, setCopied] = useState(false);
 

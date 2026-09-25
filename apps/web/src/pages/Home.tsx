@@ -42,7 +42,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Lock, Send, ArrowLeftRight, TrendingUp, ArrowDownToLine, History as HistoryIcon, Settings, ArrowUpRight, ArrowDownLeft, Coins, RefreshCw, Plug, Copy, Check, ChevronDown, LayoutGrid } from 'lucide-react';
 import { Button, IconButton, Card, ListRow, Skeleton, EmptyState } from '@7xcircle/ui';
-import { useWalletStore } from '../store/wallet.js';
+import { useWalletStore, selectActiveAccount } from '../store/wallet.js';
 import { chainRegistry } from '@7xcircle/core';
 import { CHAIN_CONFIGS, priceTokens, totalUsd } from '@7xcircle/chains';
 import { formatBalance, formatUsd } from '@7xcircle/shared';
@@ -71,7 +71,9 @@ export function Home() {
   const chainRef = useRef<HTMLDivElement | null>(null);
 
   const activeChain = CHAIN_CONFIGS.find(c => c.chainId === activeChainId);
-  const currentAccount = accounts.find(a => a.chainId === activeChainId);
+  const currentAccount = useWalletStore(selectActiveAccount);
+  const setActiveAccount = useWalletStore(s => s.setActiveAccount);
+  const addAccount = useWalletStore(s => s.addAccount);
   const adapter = chainRegistry.get(activeChainId);
 
   const { transactions: allTxs, loading: historyLoading } = useTransactionHistory(
@@ -358,6 +360,53 @@ export function Home() {
       </header>
 
       {/* ── Portfolio hero ──────────────────────────────────────────── */}
+
+      {/* ── Account switcher (multi-account chains only) ────────────── */}
+      {!viewAll && accounts.some(a => a.chainId === activeChainId) && (
+        <div style={{ display: 'flex', gap: 'var(--ow-space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
+          {accounts.filter(a => a.chainId === activeChainId).map((a, i) => {
+            const on = currentAccount?.id === a.id;
+            return (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => setActiveAccount(a.id)}
+                aria-pressed={on}
+                className="ow-mono"
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: 'var(--ow-radius-full)',
+                  border: `1px solid ${on ? 'var(--ow-accent)' : 'var(--ow-border)'}`,
+                  backgroundColor: on ? 'var(--ow-bg-hover)' : 'transparent',
+                  color: on ? 'var(--ow-text-primary)' : 'var(--ow-text-secondary)',
+                  fontSize: 'var(--ow-font-size-xs)',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                #{i + 1} {a.address.slice(2, 6)}…{a.address.slice(-4)}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => addAccount(activeChainId)}
+            style={{
+              padding: '4px 10px',
+              borderRadius: 'var(--ow-radius-full)',
+              border: '1px dashed var(--ow-border)',
+              backgroundColor: 'transparent',
+              color: 'var(--ow-info)',
+              fontSize: 'var(--ow-font-size-xs)',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            {t('home.addAccount')}
+          </button>
+        </div>
+      )}
+
       {/* ── Cross-chain portfolio (All chains view) ────────────────── */}
       {viewAll && (
         <Card centered style={{ padding: 'var(--ow-space-8)' }}>

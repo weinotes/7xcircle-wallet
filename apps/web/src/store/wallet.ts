@@ -33,12 +33,12 @@ import { persist } from 'zustand/middleware';
 import type { VaultData, Account, TransactionRecord, AppLanguage, TokenApproval } from '@7xcircle/shared';
 import { APP_NAME, DEFAULT_THEME, detectSystemLanguage, markApprovalRevoked, upsertApproval } from '@7xcircle/shared';
 import type { ChainConfig } from '@7xcircle/shared';
-import { unlock as sessionUnlock, lock as sessionLock } from '@7xcircle/core';
+import { unlock as sessionUnlock, lock as sessionLock, deriveMoreAccount } from '@7xcircle/core';
 
 /** In-memory pending txs — chainId → list of locally-known transactions */
 type PendingTxMap = Record<string, TransactionRecord[]>;
 
-interface WalletState {
+export interface WalletState {
   // ─── Vault (persisted encrypted blob — safe) ────
   vaultExists: boolean;
   encryptedVault: VaultData | null;
@@ -68,6 +68,10 @@ interface WalletState {
   activeChainId: string;
   activeAccountId: string | null;
 
+  // ─── HD accounts per chain (PERSISTED — public index metadata, drives
+  //     how many consecutive derivation indexes unlock() creates) ──
+  accountCounts: Record<string, number>;
+
   // ─── Actions ────────────────────────────
   setVault: (vault: VaultData) => void;
   clearVault: () => void;
@@ -77,6 +81,9 @@ interface WalletState {
   lock: () => void;
 
   setActiveAccount: (id: string) => void;
+
+  /** Derive + register the next HD account for a chain ("add account") */
+  addAccount: (chainId: string) => void;
 
   /** Register a Ledger/device account (public data — survives locks) */
   addHardwareAccount: (account: Account) => void;
@@ -119,6 +126,7 @@ export const useWalletStore = create<WalletState>()(
       language: detectSystemLanguage(),
       activeChainId: 'bsc-56',
       activeAccountId: null,
+      accountCounts: {},
 
       // ── Vault management ──
       setVault: (vault) => set({ vaultExists: true, encryptedVault: vault }),
@@ -134,6 +142,7 @@ export const useWalletStore = create<WalletState>()(
           activeAccountId: null,
           pendingTxs: {},
           approvals: [],
+          accountCounts: {},
         });
       },
 
@@ -143,7 +152,12 @@ export const useWalletStore = create<WalletState>()(
         if (!state.encryptedVault) {
           throw new Error('No vault found — wallet not initialized');
         }
-        const derived = await sessionUnlock(state.encryptedVault, password, chainConfigs);
+        const derived = await sessionUnlock(
+          state.encryptedVault,
+          password,
+          chainConfigs,
+          state.accountCounts,
+        );
         // device accounts join every session — signing routes to the hardware
         const accounts = [...derived, ...state.hwAccounts];
         set({
@@ -161,6 +175,17 @@ export const useWalletStore = create<WalletState>()(
 
       // ── UI ──
       setActiveAccount: (id) => set({ activeAccountId: id }),
+      addAccount: (chainId) => {
+        const account = deriveMoreAccount(chainId);
+        set(state => ({
+          accounts: [...state.accounts, account],
+          accountCounts: {
+            ...state.accountCounts,
+            [chainId]: Math.max(state.accountCounts[chainId] ?? 1, account.accountIndex + 1),
+          },
+          activeAccountId: account.id,
+        }));
+      },
       addHardwareAccount: (account) => set(state => {
         if (state.hwAccounts.some(a => a.id === account.id)) return state;
         const merged = [...state.hwAccounts, account];
@@ -176,7 +201,16 @@ export const useWalletStore = create<WalletState>()(
       })),
       setTheme: (t) => set({ theme: t }),
       setLanguage: (l) => set({ language: l }),
-      setActiveChain: (chainId) => set({ activeChainId: chainId }),
+      // Switching chains re-points the active account at the first account
+      // of the new chain — an id from another chain would silently strand
+      // every account lookup downstream.
+      setActiveChain: (chainId) => set(state => {
+        const first = state.accounts.find(a => a.chainId === chainId);
+        return {
+          activeChainId: chainId,
+          activeAccountId: first?.id ?? null,
+        };
+      }),
 
       // ── Local pending transactions (NOT persisted) ──
       addPendingTx: (chainId, tx) => set(state => {
@@ -217,6 +251,7 @@ export const useWalletStore = create<WalletState>()(
         theme: state.theme,
         language: state.language,
         activeChainId: state.activeChainId,
+        accountCounts: state.accountCounts,
         // the approval ledger records public grants this wallet signed —
         // safe to persist and must survive locks/reloads like hwAccounts
         approvals: state.approvals,
@@ -229,3 +264,16 @@ export const useWalletStore = create<WalletState>()(
     },
   ),
 );
+
+/**
+ * The account the UI is operating on: the explicitly selected one when it
+ * belongs to the active chain, else the chain's first account. Every money
+ * page resolves its signer through this — with multi-account there is no
+ * longer a safe bare `find(chainId)`.
+ */
+export function selectActiveAccount(s: WalletState): Account | undefined {
+  return (
+    s.accounts.find(a => a.chainId === s.activeChainId && a.id === s.activeAccountId) ??
+    s.accounts.find(a => a.chainId === s.activeChainId)
+  );
+}

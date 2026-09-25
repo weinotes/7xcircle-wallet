@@ -41,7 +41,7 @@ import { ArrowLeft, ArrowRight, Loader2, CheckCircle2, XCircle, Coins, Wallet, C
 import { Button, Input, Modal } from '@7xcircle/ui';
 import { chainRegistry } from '@7xcircle/core';
 import { useTransactionHistory } from '../hooks/useTransactionHistory.js';
-import { useWalletStore } from '../store/wallet.js';
+import { useWalletStore, selectActiveAccount } from '../store/wallet.js';
 import {
   CHAIN_CONFIGS,
   DEFAULT_DURATION_SEC,
@@ -191,8 +191,7 @@ export function Send() {
   }, []);
 
   const activeChainId = useWalletStore(s => s.activeChainId);
-  const accounts = useWalletStore(s => s.accounts);
-  const fromAccount = accounts.find(a => a.chainId === activeChainId);
+  const fromAccount = useWalletStore(selectActiveAccount);
 
   const adapter = chainRegistry.get(activeChainId);
   const activeChain = CHAIN_CONFIGS.find(c => c.chainId === activeChainId);

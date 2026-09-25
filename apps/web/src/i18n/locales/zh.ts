@@ -116,6 +116,7 @@ export default {
     copyAddress: '复制地址',
     sendTokenAria: '发送 {{symbol}}',
     actionsLabel: '快捷操作',
+    addAccount: '＋添加账户',
     loadDataIssue: '部分数据加载失败（{{error}}），已降级显示，可点刷新重试',
   },
 
