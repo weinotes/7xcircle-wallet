@@ -50,6 +50,21 @@ OWNER_PK[31] = 1;
 const OWNER_PUB = secp256k1.getPublicKey(OWNER_PK, false).slice(1);
 const OWNER = publicKeyToTronAddress(OWNER_PUB);
 
+/** One decoded contract entry — narrowed to the fields the assertions read */
+interface DecodedContract {
+  type: string;
+  parameter: {
+    type_url?: string;
+    value: {
+      owner_address?: string;
+      to_address?: string;
+      amount?: number;
+      data: string;
+      contract_address?: string;
+    };
+  };
+}
+
 describe('tron protobuf primitives', () => {
   it('encodes varints at the continuation boundaries', () => {
     expect(toHex(varint(0))).toBe('00');
@@ -213,7 +228,7 @@ describe('golden vector — mainnet /wallet/createtransaction output', () => {
 
   it('decodes the java-tron bytes back into faithful JSON', () => {
     const json = decodeRawDataJson(fromHex(NODE_RAW_DATA_HEX));
-    const contract = (json.contract as Record<string, any>[])[0];
+    const contract = (json.contract as DecodedContract[])[0];
     expect(contract.type).toBe('TransferContract');
     expect(contract.parameter.value.owner_address).toBe('41' + '11'.repeat(20));
     expect(contract.parameter.value.to_address).toBe('41a614f803b6fd780986a42c78ec9c7f77e6ded13c');
@@ -230,7 +245,7 @@ describe('decodeRawDataJson round-trip', () => {
     const intent: TxIntent = { kind: 'native-transfer', to: OWNER, amountRaw: '123456789' };
     const { rawData } = buildRawData({ intent, ownerAddress: OWNER, header: HEADER, nowMillis: NOW });
     const json = decodeRawDataJson(rawData);
-    const contract = (json.contract as Record<string, any>[])[0];
+    const contract = (json.contract as DecodedContract[])[0];
     expect(contract.type).toBe('TransferContract');
     expect(contract.parameter.type_url).toBe('type.googleapis.com/protocol.TransferContract');
     expect(contract.parameter.value.owner_address).toBe(toHex(tronAddressToBytes(OWNER)));
@@ -260,7 +275,7 @@ describe('decodeRawDataJson round-trip', () => {
     });
     const json = decodeRawDataJson(rawData);
     expect(json.fee_limit).toBe(12345);
-    const contract = (json.contract as Record<string, any>[])[0];
+    const contract = (json.contract as DecodedContract[])[0];
     expect(contract.type).toBe('TriggerSmartContract');
     expect(contract.parameter.value.data.startsWith('a9059cbb')).toBe(true);
     expect(contract.parameter.value.contract_address).toBe('41a614f803b6fd780986a42c78ec9c7f77e6ded13c');

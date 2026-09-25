@@ -420,9 +420,9 @@ export class EvmAdapter implements ChainAdapter {
     // signing with @noble/curves secp256k1.sign() + manual RLP encoding,
     // which is tracked as a future enhancement.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let account: any = null;
+    let account: any;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let walletClient: any = null;
+    let walletClient: any;
     let signature: string | undefined;
 
     try {
@@ -465,7 +465,11 @@ export class EvmAdapter implements ChainAdapter {
     } finally {
       // Drop references as soon as signing is done — shortens the window
       // during which the key material is reachable from the JS heap.
+      // The linter reads these as dead stores; they are deliberate retainer
+      // drops, and the value is never read again on purpose.
+      // eslint-disable-next-line no-useless-assignment
       account = null;
+      // eslint-disable-next-line no-useless-assignment
       walletClient = null;
     }
 

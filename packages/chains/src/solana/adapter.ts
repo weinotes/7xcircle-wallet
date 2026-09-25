@@ -352,7 +352,7 @@ export class SolanaAdapter implements ChainAdapter {
     // injection via decoded.addSignature(), which avoids creating a Keypair
     // altogether.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let keypair: any = null;
+    let keypair: any;
     let sigBytes: Uint8Array | undefined;
 
     try {
@@ -367,6 +367,10 @@ export class SolanaAdapter implements ChainAdapter {
       // would broadcast an unsigned transaction, which the cluster rejects.
       return { raw: toHex(decoded.serialize()), signature: bs58.encode(sigBytes) };
     } finally {
+      // Deliberate retainer drop (see the SECURITY note above) — the linter
+      // reads it as a dead store, but the value is never read again on
+      // purpose so the key material can be reclaimed earlier.
+      // eslint-disable-next-line no-useless-assignment
       keypair = null;
     }
   }

@@ -42,7 +42,6 @@ import {
   getTronsaveFundAddress,
   parseBuyOrder,
   parseEstimate,
-  parseResourceOrder,
   planResourcePurchase,
   setTronsaveBaseUrl,
   setTronsaveFundAddress,
