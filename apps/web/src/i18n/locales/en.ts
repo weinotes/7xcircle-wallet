@@ -117,9 +117,6 @@ export default {
     sendTokenAria: 'Send {{symbol}}',
     actionsLabel: 'Quick actions',
     loadDataIssue: 'Some data failed to load ({{error}}); showing a reduced view — tap refresh to retry',
-    resolvingName: 'Resolving name…',
-    unresolvedName: 'No address found for {{name}} — check the spelling or send a raw address',
-    poisoningWarning: 'This address matches the start and end of an address you have used before — but it is NOT the same. Verify every character (address-poisoning pattern).',
   },
 
   // ── Receive ──
@@ -174,6 +171,9 @@ export default {
 
   // ── Send ──
   send: {
+    resolvingName: 'Resolving name…',
+    unresolvedName: 'No address found for {{name}} — check the spelling or send a raw address',
+    poisoningWarning: 'This address matches the start and end of an address you have used before — but it is NOT the same. Verify every character (address-poisoning pattern).',
     title: 'Send',
     native: 'Native',
     erc20: 'ERC20',
@@ -378,6 +378,8 @@ export default {
     subtitle: 'Across {{count}} chains',
     assets: 'Assets ({{count}})',
     empty: 'Nothing loaded yet — pull refresh to price all chains',
+    noPrices: 'No prices available right now — balances shown unpriced',
+    unpriced: '{{count}} asset(s) could not be priced — the total may be understated',
     partialFail: '{{count}} chain(s) failed to load — results may be incomplete',
   },
 

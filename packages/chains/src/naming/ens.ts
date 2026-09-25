@@ -83,12 +83,16 @@ function ethCall(to: string, data: string): string {
   });
 }
 
+/** Per-leg deadline — a hung public RPC must never stall the send flow */
+const RPC_TIMEOUT_MS = 8_000;
+
 /** Decode an eth_call JSON-RPC response's `result` hex field. */
 async function callRpc(rpcUrl: string, to: string, data: string, fetchImpl: typeof fetch): Promise<string> {
   const res = await fetchImpl(rpcUrl, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: ethCall(to, data),
+    signal: AbortSignal.timeout(RPC_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`eth_call failed: HTTP ${res.status}`);
   const body = (await res.json()) as { result?: string };

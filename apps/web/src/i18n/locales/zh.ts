@@ -117,9 +117,6 @@ export default {
     sendTokenAria: '发送 {{symbol}}',
     actionsLabel: '快捷操作',
     loadDataIssue: '部分数据加载失败（{{error}}），已降级显示，可点刷新重试',
-    resolvingName: '正在解析域名…',
-    unresolvedName: '未找到 {{name}} 的地址——请检查拼写，或直接填写钱包地址',
-    poisoningWarning: '此地址与您曾用过的某个地址首尾相同——但并不相同。请逐字符核对（地址投毒攻击特征）。',
   },
 
   // ── 收款 ──
@@ -174,6 +171,9 @@ export default {
 
   // ── 发送 ──
   send: {
+    resolvingName: '正在解析域名…',
+    unresolvedName: '未找到 {{name}} 的地址——请检查拼写，或直接填写钱包地址',
+    poisoningWarning: '此地址与您曾用过的某个地址首尾相同——但并不相同。请逐字符核对（地址投毒攻击特征）。',
     title: '发送',
     native: '原生',
     erc20: 'ERC20',
@@ -378,6 +378,8 @@ export default {
     subtitle: '覆盖 {{count}} 条链',
     assets: '资产 ({{count}})',
     empty: '尚未加载——点刷新拉取全部链',
+    noPrices: '暂时获取不到价格——余额按未定价显示',
+    unpriced: '{{count}} 个资产无法定价——总额可能被低估',
     partialFail: '{{count}} 条链加载失败——结果可能不完整',
   },
 

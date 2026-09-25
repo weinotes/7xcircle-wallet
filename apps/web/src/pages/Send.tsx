@@ -1182,7 +1182,7 @@ export function Send() {
                 : raw.slice(0, firstDot + 1) + raw.slice(firstDot + 1).replace(/[.]/g, '');
               setAmount(cleaned);
             }}
-            error={validationError || undefined}
+            error={validationError && validationError !== t('send.invalidAddress') ? validationError : undefined}
             disabled={tokenMode === 'erc20' && !tokenInfo}
           />
         </div>

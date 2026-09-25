@@ -371,9 +371,22 @@ export function Home() {
             </>
           ) : (
             <>
+              {/* An unpriced portfolio shows a dash, never a $0.00 — and a
+                  PARTIALLY priced one says how much is missing from the sum. */}
               <div className="ow-mono" style={{ fontSize: 'var(--ow-font-size-3xl)', fontWeight: 700 }}>
-                {formatUsd(totalUsd(portfolio.tokens))}
+                {portfolio.tokens.some(tok => tok.balanceUsd !== undefined)
+                  ? formatUsd(totalUsd(portfolio.tokens))
+                  : '—'}
               </div>
+              {portfolio.tokens.some(tok => tok.balanceUsd === undefined && tok.balance && tok.balance !== '0') && (
+                <div className="ow-faint" style={{ fontSize: 'var(--ow-font-size-xs)', marginTop: 'var(--ow-space-1)' }}>
+                  {portfolio.tokens.some(tok => tok.balanceUsd !== undefined)
+                    ? t('portfolio.unpriced', {
+                      count: portfolio.tokens.filter(tok => tok.balanceUsd === undefined && tok.balance && tok.balance !== '0').length,
+                    })
+                    : t('portfolio.noPrices')}
+                </div>
+              )}
               <div className="ow-muted" style={{ fontSize: 'var(--ow-font-size-sm)', marginTop: 'var(--ow-space-1)' }}>
                 {t('portfolio.subtitle', { count: accounts.length })}
               </div>
