@@ -23,8 +23,9 @@
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { chainRegistry } from '@open-wallet/core';
+import { priceTokens, totalUsd } from '@open-wallet/chains';
 import type { Account, TokenBalance } from '@open-wallet/shared';
-import { formatBalance } from '@open-wallet/shared';
+import { formatBalance, formatUsd } from '@open-wallet/shared';
 import { Button, shorten } from '../components';
 import { orderedChains } from '../chains';
 import { sendTx } from '../tx';
@@ -75,24 +76,36 @@ function ChainAssets({ account, chainId, nativeSymbol }: { account: Account; cha
     setTokens(null);
     setFailed(false);
     adapter.getAllTokenBalances(account.address)
+      .then(list => priceTokens(list))
       .then(list => { if (!cancelled) setTokens(list); })
       .catch(() => { if (!cancelled) { setFailed(true); setTokens(null); } });
     return () => { cancelled = true; };
   }, [account.address, chainId]);
+
+  const priced = tokens?.some(token => token.balanceUsd !== undefined) ?? false;
 
   return <View style={styles.card}>
     <Text style={styles.accountName}>{nativeSymbol} account</Text>
     <Text style={styles.address}>{shorten(account.address, 14, 10)}</Text>
     {tokens === null && !failed && <Text style={styles.status}>Loading balances…</Text>}
     {failed && <Text style={styles.status}>Balance lookup failed — check connectivity.</Text>}
+    {/* Total only when something priced — a blank portfolio must not read $0.00 */}
+    {priced && tokens && tokens.length > 1 && (
+      <Text style={styles.status}>Total ≈ {formatUsd(totalUsd(tokens))}</Text>
+    )}
     {tokens?.map(token => {
       const raw = token.balance || '0';
       const zero = BigInt(raw) === 0n;
       return <View key={`${token.chainId}-${token.address}`} style={styles.assetRow}>
         <Text style={[styles.assetSymbol, zero && styles.assetZero]}>{token.symbol}</Text>
-        <Text style={[styles.assetBalance, zero && styles.assetZero]}>
-          {formatBalance(raw, token.decimals, 4)}
-        </Text>
+        <View style={{ alignItems: 'flex-end' }}>
+          <Text style={[styles.assetBalance, zero && styles.assetZero]}>
+            {formatBalance(raw, token.decimals, 4)}
+          </Text>
+          {token.balanceUsd !== undefined && (
+            <Text style={styles.status}>≈ {formatUsd(token.balanceUsd)}</Text>
+          )}
+        </View>
       </View>;
     })}
   </View>;

@@ -71,13 +71,21 @@ export interface UseTxFlowResult {
   error: string | null;
   /** Exact fee of the transaction that was broadcast */
   resolvedFee: FeeEstimate | null;
-  send: (intent: TxIntent, meta: TxMeta) => Promise<void>;
+  /**
+   * Send a wallet-built transaction. Resolves with the FINAL status.
+   *
+   * The return value exists for multi-step flows (an ERC20 approve followed by
+   * the 0x swap): the second step must not start unless the first actually
+   * confirmed, and `status` cannot be read from the hook closure — React state
+   * captured before the await is always stale.
+   */
+  send: (intent: TxIntent, meta: TxMeta) => Promise<TxFlowStatus>;
   /**
    * Send a transaction built OUTSIDE the wallet (a Jupiter/0x aggregator
    * quote). Same sign → broadcast → retry pipeline, only the build step
    * differs: importExternalTransaction instead of buildTransaction.
    */
-  sendExternal: (tx: ExternalTx, meta: TxMeta) => Promise<void>;
+  sendExternal: (tx: ExternalTx, meta: TxMeta) => Promise<TxFlowStatus>;
   reset: () => void;
 }
 
@@ -156,16 +164,17 @@ export function useTxFlow({
 
   /** Shared pipeline: build (via injected step) → sign → broadcast → wait.
    *  Both the wallet-built (intent) and aggregator-built (external) paths
-   *  run through here so key lifetime stays identical. */
+   *  run through here so key lifetime stays identical. Resolves with the
+   *  final status so a caller can chain a second transaction onto it. */
   const runPipeline = useCallback(async (
     build: () => Promise<UnsignedTx>,
     meta: TxMeta,
     allowRebuild: boolean,
-  ) => {
+  ): Promise<TxFlowStatus> => {
     if (!adapter || !account) {
       setError('Wallet not ready');
       setStatus('failed');
-      return;
+      return 'failed';
     }
 
     setError(null);
@@ -238,10 +247,10 @@ export function useTxFlow({
         const outcome = await waitForOutcome(adapter, unsigned, hash, () => !aliveRef.current);
 
         if (outcome === 'confirmed' || outcome === 'failed') {
-          if (!aliveRef.current) return;
+          if (!aliveRef.current) return outcome;
           removePendingTx(chainId, hash);
           setStatus(outcome);
-          return;
+          return outcome;
         }
 
         if (outcome === 'expired' && allowRebuild && attempt < MAX_ATTEMPTS) {
@@ -252,21 +261,24 @@ export function useTxFlow({
         // Timed out, or out of attempts: leave the record pending and let
         // the History page's poller resolve it whenever it lands.
         if (aliveRef.current) setStatus('pending');
-        return;
+        return 'pending';
       } catch (e) {
-        if (!aliveRef.current) return;
+        if (!aliveRef.current) return 'failed';
         setError(e instanceof Error ? e.message : 'Transaction failed');
         setStatus('failed');
-        return;
+        return 'failed';
       }
       // key hygiene lives inside signForAccount — a software key never
       // survives past one signing call, let alone across a retry
     }
+
+    // Only reachable when every attempt rebuilt and never resolved
+    return 'pending';
   }, [adapter, account, chainId, feeTier, addPendingTx, removePendingTx]);
 
-  const send = useCallback(async (intent: TxIntent, meta: TxMeta) => {
+  const send = useCallback(async (intent: TxIntent, meta: TxMeta): Promise<TxFlowStatus> => {
     // builder is only invoked after runPipeline's adapter/account guard
-    await runPipeline(
+    return runPipeline(
       () => (adapter as ChainAdapter).buildTransaction(intent, {
         from: (account as Account).address,
         feeTier,
@@ -277,8 +289,8 @@ export function useTxFlow({
     );
   }, [adapter, account, feeTier, runPipeline]);
 
-  const sendExternal = useCallback(async (tx: ExternalTx, meta: TxMeta) => {
-    await runPipeline(
+  const sendExternal = useCallback(async (tx: ExternalTx, meta: TxMeta): Promise<TxFlowStatus> => {
+    return runPipeline(
       () => (adapter as ChainAdapter).importExternalTransaction(tx, {
         from: (account as Account).address,
         feeTier,

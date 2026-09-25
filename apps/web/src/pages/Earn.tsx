@@ -14,38 +14,55 @@
  * limitations under the License.
  */
 /**
- * Earn page — 赚币生息 via liquid staking (web + extension twin of the
- * mobile Earn tab).
+ * Earn page — 赚币生息 (web + extension twin of the mobile Earn tab).
  *
- * Stake = Jupiter-routed SOL → LST; unstake = the reverse. Execution runs
- * through the SAME useTxFlow.sendExternal pipeline as swaps, so key
- * lifetime and retry semantics are identical everywhere in the product.
+ * Two boards, both read-only until the user acts:
+ *   1. Liquid staking (Solana) — Jupiter-routed SOL → LST and back.
+ *      Execution runs through the SAME useTxFlow.sendExternal pipeline as
+ *      swaps, so key lifetime and retry semantics are identical.
+ *   2. Stablecoin yield (EVM) — vault discovery from the LI.FI Earn API.
+ *      Discovery only: the card shows APY + protocol and links out to the
+ *      protocol's own dashboard, because depositing through LI.FI needs a
+ *      Composer key and a contract-level integration this wallet does not
+ *      ship yet. Showing a number we cannot act on is fine; faking an
+ *      in-wallet deposit route would not be.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ExternalLink } from 'lucide-react';
 import { Button, Input } from '@open-wallet/ui';
 import { chainRegistry } from '@open-wallet/core';
 import {
   SOLANA_STAKE_PRODUCTS,
   SOL_MINT,
+  ZEROX_CHAIN_IDS,
   fetchQuote,
+  fetchStablecoinVaults,
   fetchStakeApy,
   fetchSwapTransaction,
-  setJupiterBaseUrl,
+  type EarnVault,
   type StakeProduct,
   type StakeApy,
 } from '@open-wallet/chains';
 import { formatBalance, parseAmount } from '@open-wallet/shared';
 import { useWalletStore } from '../store/wallet.js';
 import { useTxFlow } from '../hooks/useTxFlow.js';
-import { SWAP_CHAIN_ID, JUPITER_BASE_URL } from '../config.js';
-
-setJupiterBaseUrl(JUPITER_BASE_URL);
+import { SWAP_CHAIN_ID } from '../config.js';
 
 const EARN_SLIPPAGE_BPS = 100;
+
+/** TVL floor for the vault board — thin vaults are not worth a card */
+const VAULT_MIN_TVL_USD = 5_000_000;
+const VAULT_LIMIT = 6;
+
+/** $12.3M / $840K / $0 — a yield card needs the order of magnitude, not cents */
+function formatUsd(value: number): string {
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
+  return `$${value.toFixed(0)}`;
+}
 
 export function Earn() {
   const { t } = useTranslation();
@@ -58,6 +75,8 @@ export function Earn() {
   const [apys, setApys] = useState<Record<string, StakeApy | 'loading' | 'error'>>({});
   const [held, setHeld] = useState<Record<string, string>>({});
   const [open, setOpen] = useState<{ product: StakeProduct; dir: 'stake' | 'unstake' } | null>(null);
+  /** null = still loading; [] = the oracle had nothing (board stays hidden) */
+  const [vaults, setVaults] = useState<EarnVault[] | null>(null);
 
   // live APY per product
   useEffect(() => {
@@ -68,6 +87,19 @@ export function Earn() {
         .then(a => { if (!cancelled) setApys(prev => ({ ...prev, [p.symbol]: a })); })
         .catch(() => { if (!cancelled) setApys(prev => ({ ...prev, [p.symbol]: 'error' })); });
     }
+    return () => { cancelled = true; };
+  }, []);
+
+  // stablecoin vaults — public endpoint, so an empty list just hides the board
+  useEffect(() => {
+    let cancelled = false;
+    fetchStablecoinVaults({
+      minTvlUsd: VAULT_MIN_TVL_USD,
+      limit: VAULT_LIMIT,
+      chainIds: [...ZEROX_CHAIN_IDS],
+    })
+      .then(v => { if (!cancelled) setVaults(v); })
+      .catch(() => { if (!cancelled) setVaults([]); });
     return () => { cancelled = true; };
   }, []);
 
@@ -88,6 +120,12 @@ export function Earn() {
     return () => { cancelled = true; };
   }, [account, adapter]);
 
+  /** Drop zero-yield entries: a 0% vault is not an offer, just a list row */
+  const boardVaults = useMemo(
+    () => (vaults ?? []).filter(v => v.apyTotalPct > 0),
+    [vaults],
+  );
+
   const execute = useCallback(async (quoteParams: { inputMint: string; outputMint: string; amountRaw: string }, product: StakeProduct, dir: 'stake' | 'unstake') => {
     if (!account || !adapter) return;
     const quote = await fetchQuote({ ...quoteParams, slippageBps: EARN_SLIPPAGE_BPS });
@@ -106,15 +144,6 @@ export function Earn() {
       },
     );
   }, [account, adapter, flow]);
-
-  if (!account) {
-    return (
-      <div style={{ padding: 'var(--ow-space-4)' }}>
-        <p>{t('earn.noSolanaAccount')}</p>
-        <Button onClick={() => navigate('/')}>{t('common.back')}</Button>
-      </div>
-    );
-  }
 
   return (
     <div style={{ padding: 'var(--ow-space-4)', maxWidth: 520, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 'var(--ow-space-4)' }}>
@@ -138,7 +167,15 @@ export function Earn() {
         </div>
       )}
 
-      {SOLANA_STAKE_PRODUCTS.map(product => {
+      {/* Staking needs a Solana account; the vault board below does not, so
+          an EVM-only wallet still gets the yield screen instead of a dead end. */}
+      {!account && (
+        <p style={{ margin: 0, fontSize: 'var(--ow-font-size-sm)', color: 'var(--ow-text-tertiary)' }}>
+          {t('earn.noSolanaAccount')}
+        </p>
+      )}
+
+      {account && SOLANA_STAKE_PRODUCTS.map(product => {
         const apy = apys[product.symbol];
         const balance = held[product.symbol];
         const isOpen = open?.product.symbol === product.symbol;
@@ -187,6 +224,57 @@ export function Earn() {
           </div>
         );
       })}
+
+      {/* ── Stablecoin yield (discovery only) ──────────────────────── */}
+      {boardVaults.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--ow-space-3)', marginTop: 'var(--ow-space-2)' }}>
+          <div>
+            <div style={{ fontWeight: 700 }}>{t('earn.stablecoinTitle')}</div>
+            <div style={{ fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-text-tertiary)' }}>
+              {t('earn.stablecoinIntro')}
+            </div>
+          </div>
+          {boardVaults.map(vault => (
+            <div key={`${vault.chainId}:${vault.address}`} style={{
+              backgroundColor: 'var(--ow-bg-secondary)',
+              border: '1px solid var(--ow-border)',
+              borderRadius: 'var(--ow-radius-lg)',
+              padding: 'var(--ow-space-4)',
+              display: 'flex', flexDirection: 'column', gap: 'var(--ow-space-2)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--ow-space-2)' }}>
+                <div>
+                  <div style={{ fontWeight: 700 }}>
+                    {vault.underlyingTokens[0]?.symbol ?? ''} · {vault.protocol.name}
+                  </div>
+                  <div style={{ fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-text-tertiary)' }}>
+                    {vault.name} · {vault.network}
+                  </div>
+                </div>
+                <div style={{ fontWeight: 700, color: 'var(--ow-accent)', whiteSpace: 'nowrap' }}>
+                  {vault.apyTotalPct.toFixed(2)}%
+                </div>
+              </div>
+              <div style={{ fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-text-tertiary)' }}>
+                {t('earn.vaultTvl', { tvl: formatUsd(vault.tvlUsd) })}
+                {vault.apy30dPct !== null ? ` · ${t('earn.vaultApy30d', { apy: vault.apy30dPct.toFixed(2) })}` : ''}
+              </div>
+              {/* The link is the product: this wallet does not custody the
+                  deposit, so the user acts on the protocol's own site. */}
+              {vault.externalUrl && (
+                <a
+                  href={vault.externalUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ display: 'inline-flex', gap: 4, alignItems: 'center', fontSize: 'var(--ow-font-size-sm)', color: 'var(--ow-accent)' }}
+                >
+                  {t('earn.vaultOpen', { protocol: vault.protocol.name })} <ExternalLink size={12} />
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

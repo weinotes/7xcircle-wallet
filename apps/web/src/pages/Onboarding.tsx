@@ -261,7 +261,7 @@ export function Onboarding() {
               style={{
                 padding: 'var(--ow-space-2) var(--ow-space-4)',
                 backgroundColor: wordCount === n ? 'var(--ow-info)' : 'var(--ow-bg-tertiary)',
-                color: wordCount === n ? '#000' : 'var(--ow-text-primary)',
+                color: wordCount === n ? 'var(--ow-accent-fg)' : 'var(--ow-text-primary)',
                 border: wordCount === n ? '2px solid var(--ow-info)' : '1px solid var(--ow-border-subtle)',
                 borderRadius: 'var(--ow-radius-md)',
                 cursor: 'pointer',
@@ -343,7 +343,7 @@ export function Onboarding() {
                       style={{
                         padding: 'var(--ow-space-3)',
                         backgroundColor: selected ? 'var(--ow-info)' : 'var(--ow-bg-tertiary)',
-                        color: selected ? '#000' : 'var(--ow-text-primary)',
+                        color: selected ? 'var(--ow-accent-fg)' : 'var(--ow-text-primary)',
                         border: selected ? '2px solid var(--ow-info)' : '1px solid var(--ow-border-subtle)',
                         borderRadius: 'var(--ow-radius-md)',
                         fontFamily: 'var(--ow-font-mono)',
@@ -395,7 +395,7 @@ export function Onboarding() {
                 flex: 1,
                 padding: 'var(--ow-space-2)',
                 backgroundColor: importKind === kind ? 'var(--ow-info)' : 'var(--ow-bg-tertiary)',
-                color: importKind === kind ? '#000' : 'var(--ow-text-primary)',
+                color: importKind === kind ? 'var(--ow-accent-fg)' : 'var(--ow-text-primary)',
                 border: importKind === kind ? '2px solid var(--ow-info)' : '1px solid var(--ow-border-subtle)',
                 borderRadius: 'var(--ow-radius-md)',
                 cursor: 'pointer',

@@ -34,19 +34,32 @@
  *   - Token sends always call `.transfer()` (no infinite approval flow)
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ArrowRight, Loader2, CheckCircle2, XCircle, Coins, Wallet, ChevronDown, ListPlus } from 'lucide-react';
 import { Button, Input, Modal } from '@open-wallet/ui';
 import { chainRegistry } from '@open-wallet/core';
 import { useWalletStore } from '../store/wallet.js';
-import { CHAIN_CONFIGS } from '@open-wallet/chains';
-import type { TokenSafety } from '@open-wallet/chains';
-import { fetchTokenSafety } from '@open-wallet/chains';
+import {
+  CHAIN_CONFIGS,
+  DEFAULT_DURATION_SEC,
+  MIN_ENERGY_ORDER,
+  buildPaymentIntent,
+  buyResource,
+  estimateBuyResource,
+  fetchResourceOrder,
+  fundAddressFor,
+  planResourcePurchase,
+  type ResourceEstimate,
+  type ResourceOrder,
+  type SignedTxPayload,
+  type TronResourceEstimate,
+} from '@open-wallet/chains';
 import { formatBalance } from '@open-wallet/shared';
 import type { FeeTier, TokenBalance, TxIntent } from '@open-wallet/shared';
 import { useTxFlow } from '../hooks/useTxFlow.js';
+import { signForAccount } from '../hw/signFor.js';
 
 type TxStatus = 'idle' | 'estimating' | 'ready' | 'building' | 'signing' | 'broadcasting' | 'pending' | 'confirmed' | 'failed';
 /** Statuses owned by local fee estimation (the hook owns the rest) */
@@ -58,6 +71,62 @@ interface Erc20Info {
   decimals: number;
   name: string;
   address: string;
+}
+
+/**
+ * Tron's resource model, which only TronAdapter implements. Kept as a local
+ * capability interface so this page can offer the energy advisory for TRON
+ * without casting the shared ChainAdapter contract into something it is not.
+ */
+interface TronResourceCapable {
+  estimateResources(intent: TxIntent, opts: { from: string; feeTier?: FeeTier }): Promise<TronResourceEstimate>;
+}
+
+/** The energy advisory shown above the send button on TRON */
+interface EnergyHint {
+  energyUsed: number;
+  energyShortfall: number;
+  /** TRX (in SUN) burned as gas for the uncovered energy */
+  burnSun: string;
+  /** lot the rental market can actually sell; 0 when there is nothing to buy */
+  orderAmount: number;
+  skipReason?: 'covered' | 'below-minimum';
+  /** the priced rental lot, or null when no supplier quoted this lot */
+  rent: ResourceEstimate | null;
+}
+
+/**
+ * Rental purchase state. Kept inline (not a modal) so the exact TRX cost and
+ * the fund address sit next to the number that justified the purchase.
+ */
+type RentalStep = 'idle' | 'confirm' | 'working' | 'done' | 'error';
+
+/** Poll cadence for a placed order — the delegation lands in seconds usually */
+const RENT_POLL_INTERVAL_MS = 5_000;
+const RENT_POLL_ATTEMPTS = 12;
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Wait for a rental order to fill.
+ *
+ * Returns the last order it managed to read — `null` only when every read
+ * failed. A partially filled order is a real outcome (the supplier may deliver
+ * in instalments), so the caller renders the percentage rather than waiting
+ * for 100%.
+ */
+async function waitForRental(orderId: string, isCancelled: () => boolean): Promise<ResourceOrder | null> {
+  let last: ResourceOrder | null = null;
+  for (let attempt = 0; attempt < RENT_POLL_ATTEMPTS; attempt++) {
+    if (isCancelled()) return last;
+    const order = await fetchResourceOrder(orderId);
+    if (order) {
+      last = order;
+      if (order.fulfilledPercent >= 100) return order;
+    }
+    if (attempt < RENT_POLL_ATTEMPTS - 1) await sleep(RENT_POLL_INTERVAL_MS);
+  }
+  return last;
 }
 
 export function Send() {
@@ -76,8 +145,12 @@ export function Send() {
   const [tokenInfo, setTokenInfo] = useState<Erc20Info | null>(null);
   const [tokenInfoLoading, setTokenInfoLoading] = useState(false);
   const [tokenInfoError, setTokenInfoError] = useState<string | null>(null);
-  /** GoPlus honeypot/tax scan — advisory banner, null = no data */
-  const [tokenSafety, setTokenSafety] = useState<TokenSafety | null>(null);
+  /**
+   * Token-safety findings for the entered contract — advisory banner.
+   * `null` = the chain (or the oracle) has no opinion. An empty array means
+   * every check passed, so the two must never be collapsed.
+   */
+  const [safetyWarnings, setSafetyWarnings] = useState<string[] | null>(null);
 
   // Held tokens list (for dropdown selection), and manual-input toggle
   const [heldTokens, setHeldTokens] = useState<TokenBalance[]>([]);
@@ -97,6 +170,17 @@ export function Send() {
   } | null>(null);
   const [balance, setBalance] = useState<string>('0');
   const [validationError, setValidationError] = useState('');
+  /** TRON only — null whenever the advisory does not apply */
+  const [energyHint, setEnergyHint] = useState<EnergyHint | null>(null);
+  /** TRON rental purchase, driven from the advisory card */
+  const [rentalStep, setRentalStep] = useState<RentalStep>('idle');
+  const [rentalError, setRentalError] = useState<string | null>(null);
+  const [rentalOrder, setRentalOrder] = useState<ResourceOrder | null>(null);
+  const rentalAlive = useRef(true);
+  useEffect(() => {
+    rentalAlive.current = true;
+    return () => { rentalAlive.current = false; };
+  }, []);
 
   const activeChainId = useWalletStore(s => s.activeChainId);
   const accounts = useWalletStore(s => s.accounts);
@@ -225,17 +309,13 @@ export function Send() {
         const info = await adapter.getTokenInfo(erc20Address);
         if (cancelled) return;
         setTokenInfo({ ...info, address: erc20Address });
-        // GoPlus scan for EVM chains — advisory only, never blocks (false
-        // positives exist), but a honeypot flag must be LOUD
-        const decimal = CHAIN_CONFIGS.find(c => c.chainId === activeChainId)?.chainIdDecimal;
-        if (decimal !== undefined && ['56', '1', '137', '42161', '10', '8453', '43114'].includes(String(decimal))) {
-          setTokenSafety(null);
-          fetchTokenSafety(String(decimal) as '56', erc20Address)
-            .then(s => { if (!cancelled) setTokenSafety(s); })
-            .catch(() => undefined);
-        } else {
-          setTokenSafety(null);
-        }
+        // Token-safety scan — EVM via GoPlus, Solana straight off the mint
+        // account. Advisory only, never blocks (false positives exist), but
+        // a honeypot or a live mint authority must be LOUD.
+        setSafetyWarnings(null);
+        adapter.getTokenSafety?.(erc20Address)
+          .then(report => { if (!cancelled) setSafetyWarnings(report?.warnings ?? null); })
+          .catch(() => { if (!cancelled) setSafetyWarnings(null); });
       } catch {
         if (cancelled) return;
         setTokenInfo(null);
@@ -370,6 +450,155 @@ export function Send() {
       }
     }
   }, [toAddress, amount, adapter, fromAccount, activeChain, tokenMode, erc20Address, tokenInfo, sendToken, balance, tokenInfoLoading, tokenInfoError, feeTier]);
+
+  // ── TRON energy advisory (TRC20 only) ──────────────────────────────
+  /**
+   * A TRC20 transfer consumes energy. Anything the account has not staked is
+   * burned as TRX — and renting that energy from the open market is usually
+   * cheaper, which is exactly what TronSave prices for us (keyless, so this
+   * line works with zero configuration). The number is shown BEFORE signing,
+   * because afterwards it is already spent.
+   *
+   * A plain TRX send burns only bandwidth, which is cheap enough that an
+   * advisory would be noise — hence the TRC20-only gate.
+   */
+  useEffect(() => {
+    // A recomputed hint invalidates any rental confirmation the user was
+    // looking at — the price it referred to may no longer be the price.
+    setRentalStep('idle');
+    setRentalError(null);
+    setRentalOrder(null);
+
+    const capable = adapter as Partial<TronResourceCapable> | undefined;
+    if (
+      activeChain?.type !== 'tron' ||
+      !fromAccount ||
+      tokenMode !== 'erc20' ||
+      !tokenInfo ||
+      !adapter ||
+      typeof capable?.estimateResources !== 'function' ||
+      !toAddress ||
+      !adapter.validateAddress(toAddress)
+    ) {
+      setEnergyHint(null);
+      return;
+    }
+
+    let rawAmount = '';
+    try {
+      rawAmount = adapter.parseTokenAmount(amount, tokenInfo.decimals);
+    } catch {
+      setEnergyHint(null);
+      return;
+    }
+    if (!rawAmount || BigInt(rawAmount) <= 0n) {
+      setEnergyHint(null);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const estimate = await (capable.estimateResources as TronResourceCapable['estimateResources']).call(
+          adapter,
+          {
+            kind: 'token-transfer',
+            token: tokenInfo.address,
+            decimals: tokenInfo.decimals,
+            to: toAddress,
+            amountRaw: rawAmount,
+          },
+          { from: fromAccount.address },
+        );
+        if (cancelled) return;
+
+        const gap = planResourcePurchase(estimate.energyUsed, estimate.energyAvailable, MIN_ENERGY_ORDER);
+        // Only ask for a price when there is a whole lot to buy: a sub-lot
+        // gap has no order, so a price for it would be fiction.
+        const rent = gap.orderAmount > 0
+          ? await estimateBuyResource({
+              // The SENDER pays the energy bill, so the sender is the receiver
+              // of the delegation.
+              receiver: fromAccount.address,
+              resourceType: 'ENERGY',
+              resourceAmount: gap.orderAmount,
+              durationSec: DEFAULT_DURATION_SEC,
+              unitPrice: 'SLOW',
+            })
+          : null;
+        if (cancelled) return;
+
+        setEnergyHint({
+          energyUsed: estimate.energyUsed,
+          energyShortfall: estimate.energyShortfall,
+          burnSun: estimate.burnSun,
+          orderAmount: gap.orderAmount,
+          ...(gap.skipReason ? { skipReason: gap.skipReason } : {}),
+          rent,
+        });
+      } catch {
+        // No advisory is better than a wrong one
+        if (!cancelled) setEnergyHint(null);
+      }
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [activeChain, adapter, fromAccount, tokenMode, tokenInfo, toAddress, amount]);
+
+  /**
+   * Buy the priced energy lot.
+   *
+   * The payment is signed here but deliberately NEVER broadcast by us: TronSave
+   * broadcasts it as part of the order, and a payment the order does not know
+   * about is money lost. So the failure mode is safe — a failed order leaves an
+   * unbroadcast signature that simply expires with its TAPOS reference, and no
+   * TRX has moved.
+   */
+  const handleRentEnergy = useCallback(async () => {
+    const rent = energyHint?.rent;
+    if (!adapter || !fromAccount || !activeChain || !rent) return;
+
+    setRentalStep('working');
+    setRentalError(null);
+    setRentalOrder(null);
+    try {
+      const intent = buildPaymentIntent(rent.estimateTrxSun, fundAddressFor(!!activeChain.testnet));
+      const unsigned = await adapter.buildTransaction(intent, {
+        from: fromAccount.address,
+        feeTier,
+      });
+      const signed = await signForAccount(fromAccount, unsigned, adapter);
+
+      const ack = await buyResource(
+        {
+          receiver: fromAccount.address,
+          resourceType: 'ENERGY',
+          unitPriceSun: rent.unitPriceSun,
+          resourceAmount: energyHint.orderAmount,
+          durationSec: DEFAULT_DURATION_SEC,
+        },
+        signed.raw as SignedTxPayload,
+      );
+      if (!ack) {
+        if (!rentalAlive.current) return;
+        setRentalError(t('send.tronEnergyRentFailed'));
+        setRentalStep('error');
+        return;
+      }
+
+      const order = await waitForRental(ack.orderId, () => !rentalAlive.current);
+      if (!rentalAlive.current) return;
+      setRentalOrder(order ?? { orderId: ack.orderId, fulfilledPercent: 0, remainAmount: 0, payoutAmount: 0, delegates: [] });
+      setRentalStep('done');
+    } catch (e) {
+      if (!rentalAlive.current) return;
+      setRentalError(e instanceof Error ? e.message : t('send.tronEnergyRentFailed'));
+      setRentalStep('error');
+    }
+  }, [adapter, fromAccount, activeChain, energyHint, feeTier, t]);
 
   // Confirmation polling now lives in useTxFlow, which also owns the
   // Solana blockhash-expiry retry.
@@ -760,7 +989,7 @@ export function Send() {
               alignItems: 'center',
               gap: 6,
             }}>
-              <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> {t('send.readingTokenInfo')}
+              <Loader2 size={10} style={{ animation: 'ow-spin 1s linear infinite' }} /> {t('send.readingTokenInfo')}
             </div>
           )}
           {tokenInfo && (
@@ -771,8 +1000,8 @@ export function Send() {
               {t('send.tokenLoaded', { name: tokenInfo.name || tokenInfo.symbol, symbol: tokenInfo.symbol, decimals: tokenInfo.decimals })}
             </div>
           )}
-          {/* GoPlus advisory: red = concrete risks found, muted = no data */}
-          {tokenSafety && tokenSafety.warnings.length > 0 && (
+          {/* Safety advisory: red = concrete risks found, muted = no data */}
+          {safetyWarnings && safetyWarnings.length > 0 && (
             <div style={{
               fontSize: 'var(--ow-font-size-xs)',
               color: 'var(--ow-danger)',
@@ -780,15 +1009,15 @@ export function Send() {
               borderRadius: 'var(--ow-radius-sm, 8px)',
               padding: '6px 8px',
             }}>
-              ⚠️ {t('send.safetyRisks', { risks: tokenSafety.warnings.join(' · ') })}
+              ⚠️ {t('send.safetyRisks', { risks: safetyWarnings.join(' · ') })}
             </div>
           )}
-          {tokenSafety && tokenSafety.warnings.length === 0 && (
+          {safetyWarnings && safetyWarnings.length === 0 && (
             <div style={{ fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-text-tertiary)' }}>
               ✓ {t('send.safetyClean')}
             </div>
           )}
-          {!tokenSafety && !tokenInfoLoading && tokenInfo && (
+          {!safetyWarnings && !tokenInfoLoading && tokenInfo && (
             <div style={{ fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-text-tertiary)' }}>
               {t('send.safetyUnknown')}
             </div>
@@ -921,9 +1150,105 @@ export function Send() {
           </span>
         </div>
       )}
+
+      {/* ── TRON energy advisory ────────────────────────────────────── */}
+      {energyHint && activeChain && (
+        <div style={{
+          backgroundColor: 'var(--ow-bg-secondary)',
+          padding: 'var(--ow-space-3)',
+          borderRadius: 'var(--ow-radius-md)',
+          border: '1px solid var(--ow-border-subtle)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4,
+          fontSize: 'var(--ow-font-size-xs)',
+        }}>
+          <div style={{ color: 'var(--ow-text-tertiary)' }}>{t('send.tronEnergyTitle')}</div>
+          {energyHint.energyShortfall > 0 ? (
+            <>
+              <div>
+                {t('send.tronEnergyBurn', {
+                  amount: formatBalance(energyHint.burnSun, activeChain.nativeDecimals, 4),
+                  symbol: activeChain.nativeSymbol,
+                })}
+              </div>
+              {/* Rendered only when a supplier actually priced this lot */}
+              {energyHint.rent && (
+                <div style={{ color: 'var(--ow-success)' }}>
+                  {t('send.tronEnergyRent', {
+                    amount: formatBalance(energyHint.rent.estimateTrxSun, activeChain.nativeDecimals, 4),
+                    symbol: activeChain.nativeSymbol,
+                  })}
+                </div>
+              )}
+              {energyHint.skipReason === 'below-minimum' && (
+                <div style={{ color: 'var(--ow-text-tertiary)' }}>{t('send.tronEnergySubLot')}</div>
+              )}
+
+              {/* ── Rental purchase ─────────────────────────────────── */}
+              {energyHint.rent && rentalStep === 'idle' && (
+                <Button variant="secondary" size="sm" onClick={() => setRentalStep('confirm')}>
+                  {t('send.tronEnergyRentAction')}
+                </Button>
+              )}
+              {energyHint.rent && rentalStep === 'confirm' && (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                  marginTop: 4,
+                  paddingTop: 6,
+                  borderTop: '1px solid var(--ow-border-subtle)',
+                }}>
+                  <div>
+                    {t('send.tronEnergyRentConfirm', {
+                      amount: formatBalance(energyHint.rent.estimateTrxSun, activeChain.nativeDecimals, 4),
+                      symbol: activeChain.nativeSymbol,
+                    })}
+                  </div>
+                  {/* The payment goes to the supplier's collection address, so
+                      show it — a rental is still a transfer of real TRX. */}
+                  <div style={{ fontFamily: 'var(--ow-font-mono)', wordBreak: 'break-all', color: 'var(--ow-text-tertiary)' }}>
+                    {fundAddressFor(!!activeChain.testnet)}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <Button variant="secondary" size="sm" onClick={() => setRentalStep('idle')}>
+                      {t('common.cancel')}
+                    </Button>
+                    <Button size="sm" onClick={handleRentEnergy}>
+                      {t('send.tronEnergyRentConfirmAction')}
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {rentalStep === 'working' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--ow-text-tertiary)' }}>
+                  <Loader2 size={12} style={{ animation: 'ow-spin 1s linear infinite' }} />
+                  {t('send.tronEnergyRenting')}
+                </div>
+              )}
+              {rentalStep === 'done' && rentalOrder && (
+                <div style={{ color: 'var(--ow-success)' }}>
+                  {rentalOrder.fulfilledPercent >= 100
+                    ? t('send.tronEnergyRentDone')
+                    : t('send.tronEnergyRentPending', { percent: rentalOrder.fulfilledPercent })}
+                </div>
+              )}
+              {rentalStep === 'error' && rentalError && (
+                <div style={{ color: 'var(--ow-error)' }}>{rentalError}</div>
+              )}
+            </>
+          ) : (
+            <div style={{ color: 'var(--ow-success)' }}>
+              {t('send.tronEnergyCovered', { energy: energyHint.energyUsed.toLocaleString() })}
+            </div>
+          )}
+        </div>
+      )}
+
       {status === 'estimating' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--ow-space-2)', fontSize: 'var(--ow-font-size-sm)', color: 'var(--ow-text-tertiary)' }}>
-          <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> {t('send.estimatingFee')}
+          <Loader2 size={14} style={{ animation: 'ow-spin 1s linear infinite' }} /> {t('send.estimatingFee')}
         </div>
       )}
 
@@ -938,7 +1263,7 @@ export function Send() {
           gap: 'var(--ow-space-2)',
           border: '1px solid var(--ow-border)',
         }}>
-          <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+          <Loader2 size={16} style={{ animation: 'ow-spin 1s linear infinite' }} />
           <span style={{ fontSize: 'var(--ow-font-size-sm)' }}>
             {status === 'building' && t('send.preparing')}
             {status === 'signing' && t('send.signing')}
@@ -956,7 +1281,7 @@ export function Send() {
           border: '1px solid var(--ow-info)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--ow-space-2)', marginBottom: 'var(--ow-space-2)' }}>
-            <Loader2 size={14} style={{ animation: 'spin 1s linear infinite', color: 'var(--ow-info)' }} />
+            <Loader2 size={14} style={{ animation: 'ow-spin 1s linear infinite', color: 'var(--ow-info)' }} />
             <span style={{ fontSize: 'var(--ow-font-size-sm)', color: 'var(--ow-info)' }}>
               {t('send.waitingConfirmation')}
             </span>

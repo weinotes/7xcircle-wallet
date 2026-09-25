@@ -74,7 +74,7 @@ interface PendingRequest {
 let pending: PendingRequest[] = [];
 let counter = 0;
 const respondTo = new Map<string, (msg: unknown) => void>();
-let popupPorts: Set<chrome.runtime.Port> = new Set();
+const popupPorts: Set<chrome.runtime.Port> = new Set();
 
 async function readStorage<T>(key: string, fallback: T): Promise<T> {
   const data = await chrome.storage.local.get(key);

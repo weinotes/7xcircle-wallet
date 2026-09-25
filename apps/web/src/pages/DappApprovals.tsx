@@ -245,7 +245,7 @@ export function DappApprovals() {
             {' '}· {new Date(req.receivedAt).toLocaleTimeString()}
           </div>
           <pre style={{
-            background: 'var(--ow-bg-subtle, rgba(127,127,127,.08))',
+            background: 'var(--ow-bg-tertiary)',
             borderRadius: 8, padding: 10, fontSize: 12, maxHeight: 180, overflow: 'auto',
             whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0,
           }}>
