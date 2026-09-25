@@ -679,6 +679,50 @@ export function Send() {
     });
   }, [flow.resolvedFee, activeChain]);
 
+  // ── Pre-sign simulation + review modal ─────────────────────────────
+  /**
+   * Run a chain-level simulation before opening the confirm modal.
+   *
+   * If the adapter supports `simulateTransaction`, we ask the chain whether
+   * this transaction would succeed. A failed result disables the confirm
+   * button so the user cannot waste gas on a reverting tx. Adapters that
+   * return `null` (no simulation support) get a soft "unavailable" warning
+   * in the modal instead of a hard block.
+   */
+  const handleReview = useCallback(async () => {
+    setSimulation(undefined); // reset to show spinner
+
+    if (adapter?.simulateTransaction && fromAccount) {
+      try {
+        const rawAmount = sendToken.isNative
+          ? adapter.parseAmount(amount)
+          : adapter.parseTokenAmount(amount, sendToken.decimals);
+        const intent: TxIntent = sendToken.isNative
+          ? { kind: 'native-transfer', to: toAddress, amountRaw: rawAmount }
+          : {
+              kind: 'token-transfer',
+              token: sendToken.address,
+              decimals: sendToken.decimals,
+              to: toAddress,
+              amountRaw: rawAmount,
+            };
+        const result = await adapter.simulateTransaction(intent, {
+          from: fromAccount.address,
+          feeTier,
+        });
+        setSimulation(result);
+      } catch {
+        // Treat RPC / adapter errors as "simulation unavailable" (soft warning)
+        setSimulation(null);
+      }
+    } else {
+      // Adapter does not support simulation
+      setSimulation(null);
+    }
+
+    setShowConfirm(true);
+  }, [adapter, fromAccount, sendToken, amount, toAddress, feeTier]);
+
   // ── Main send handler ──────────────────────────────────────────────
   const handleSend = async () => {
     if (!adapter || !fromAccount) {
@@ -1406,39 +1450,7 @@ export function Send() {
       {!showConfirm && !['building', 'signing', 'broadcasting', 'pending'].includes(status) && (
         <Button
           disabled={!!validationError || status !== 'ready' || (tokenMode === 'erc20' && !tokenInfo)}
-          onClick={async () => {
-            // Run pre-sign simulation before opening the confirm modal.
-            // If the adapter doesn't support it, `null` is returned and the
-            // modal shows a soft "simulation unavailable" warning instead.
-            if (adapter?.simulateTransaction && fromAccount) {
-              setSimulation(undefined); // reset to trigger spinner
-              try {
-                const rawAmount = sendToken.isNative
-                  ? adapter.parseAmount(amount)
-                  : adapter.parseTokenAmount(amount, sendToken.decimals);
-                const intent: TxIntent = sendToken.isNative
-                  ? { kind: 'native-transfer', to: toAddress, amountRaw: rawAmount }
-                  : {
-                      kind: 'token-transfer',
-                      token: sendToken.address,
-                      decimals: sendToken.decimals,
-                      to: toAddress,
-                      amountRaw: rawAmount,
-                    };
-                const result = await adapter.simulateTransaction(intent, {
-                  from: fromAccount.address,
-                  feeTier,
-                });
-                setSimulation(result);
-              } catch {
-                // Simulation error = treat as unavailable (soft warning)
-                setSimulation(null);
-              }
-            } else {
-              setSimulation(null);
-            }
-            setShowConfirm(true);
-          }}
+          onClick={handleReview}
           size="lg"
         >
           {t('send.reviewTransaction')} <ArrowRight size={16} />
