@@ -27,6 +27,7 @@ import { Receive } from './pages/Receive.js';
 import { History } from './pages/History.js';
 import { Settings } from './pages/Settings.js';
 import { DappApprovals } from './pages/DappApprovals.js';
+import { Approvals } from './pages/Approvals.js';
 import { LedgerConnect } from './pages/LedgerConnect.js';
 import { useWalletStore } from './store/wallet.js';
 import { useThemeSync } from './hooks/useThemeSync.js';
@@ -120,6 +121,7 @@ function App() {
       <Route path="/history" element={<History />} />
       <Route path="/settings" element={<Settings />} />
       <Route path="/dapp" element={<DappApprovals />} />
+      <Route path="/approvals" element={<Approvals />} />
       <Route path="/ledger" element={<LedgerConnect />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

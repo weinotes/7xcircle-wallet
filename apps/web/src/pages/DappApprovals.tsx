@@ -42,6 +42,7 @@ import { useWalletStore } from '../store/wallet.js';
 import { signForAccount } from '../hw/signFor.js';
 import { ledgerPathOf, ledgerSignMessage, openEthApp } from '../hw/ledger.js';
 import { CHAIN_CONFIGS } from '@7xcircle/chains';
+import { parseErc20ApprovalCalldata } from '@7xcircle/shared';
 import type { SitePermission } from '@7xcircle/core';
 
 interface PendingRequest {
@@ -169,6 +170,28 @@ export function DappApprovals() {
         const signed = await signForAccount(account, built, adapter);
         const hash = await adapter.sendTransaction(signed);
         resolve(req.id, true, hash);
+
+        // If the dApp just talked the user into an ERC20 approve, book it in
+        // the approval ledger — the Approvals page is the revocation exit.
+        const grant = parseErc20ApprovalCalldata(tx.data);
+        if (grant && tx.to) {
+          try {
+            const info = await adapter.getTokenInfo(tx.to);
+            useWalletStore.getState().recordApproval({
+              chainId: activeChainId,
+              token: tx.to,
+              spender: grant.spender,
+              symbol: info.symbol,
+              decimals: info.decimals,
+              amountRaw: grant.amountRaw,
+              createdAt: Math.floor(Date.now() / 1000),
+              source: 'dapp',
+            });
+          } catch {
+            // Metadata lookup failed — the grant still exists on chain; the
+            // ledger simply cannot describe it. Skipping beats storing a lie.
+          }
+        }
         return;
       }
 

@@ -37,6 +37,7 @@ import { Receive } from '@web/pages/Receive.js';
 import { History } from '@web/pages/History.js';
 import { Settings } from '@web/pages/Settings.js';
 import { DappApprovals } from '@web/pages/DappApprovals.js';
+import { Approvals } from '@web/pages/Approvals.js';
 import { LedgerConnect } from '@web/pages/LedgerConnect.js';
 import { useWalletStore } from '@web/store/wallet.js';
 import { useThemeSync } from '@web/hooks/useThemeSync.js';
@@ -115,6 +116,7 @@ function AppShell() {
       <Route path="/swap" element={<Swap />} />
       <Route path="/earn" element={<Earn />} />
       <Route path="/dapp" element={<DappApprovals />} />
+      <Route path="/approvals" element={<Approvals />} />
       <Route path="/ledger" element={<LedgerConnect />} />
       <Route path="/receive" element={<Receive />} />
       <Route path="/history" element={<History />} />

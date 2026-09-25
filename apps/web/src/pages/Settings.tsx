@@ -18,7 +18,7 @@
  */
 
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Trash2, ChevronDown, Check, Usb } from 'lucide-react';
+import { ArrowLeft, Trash2, ChevronDown, Check, Usb, ShieldOff } from 'lucide-react';
 import { Button, Modal } from '@7xcircle/ui';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -241,6 +241,25 @@ export function Settings() {
           <Usb size={16} /> {t('settings.hardwareWallet')}
         </span>
         <span style={{ color: 'var(--ow-text-tertiary)' }}>Ledger · OneKey →</span>
+      </button>
+
+      {/* ── Token approvals ledger (grants this wallet signed, revocable) ── */}
+      <button
+        type="button"
+        onClick={() => navigate('/approvals')}
+        style={{
+          ...rowStyle,
+          width: '100%',
+          cursor: 'pointer',
+          color: 'var(--ow-text-primary)',
+          fontFamily: 'inherit',
+          fontSize: 'var(--ow-font-size-sm)',
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--ow-space-2)' }}>
+          <ShieldOff size={16} /> {t('settings.tokenApprovals')}
+        </span>
+        <span style={{ color: 'var(--ow-text-tertiary)' }}>→</span>
       </button>
 
       <div style={{ borderTop: '1px solid var(--ow-border)', paddingTop: 'var(--ow-space-4)' }}>

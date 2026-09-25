@@ -30,8 +30,8 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { VaultData, Account, TransactionRecord, AppLanguage } from '@7xcircle/shared';
-import { APP_NAME, DEFAULT_THEME, detectSystemLanguage } from '@7xcircle/shared';
+import type { VaultData, Account, TransactionRecord, AppLanguage, TokenApproval } from '@7xcircle/shared';
+import { APP_NAME, DEFAULT_THEME, detectSystemLanguage, markApprovalRevoked, upsertApproval } from '@7xcircle/shared';
 import type { ChainConfig } from '@7xcircle/shared';
 import { unlock as sessionUnlock, lock as sessionLock } from '@7xcircle/core';
 
@@ -57,6 +57,10 @@ interface WalletState {
   // Populated after Send broadcasts so Home/History can show them instantly
   // before the explorer API picks them up (10-30s delay typical).
   pendingTxs: PendingTxMap;
+
+  // ─── Token-approval ledger (PERSISTED — public on-chain grants issued
+  //     through THIS wallet; survives locks, cleared only with the vault) ──
+  approvals: TokenApproval[];
 
   // ─── UI state (persisted — safe, just preferences) ──
   theme: 'dark' | 'light';
@@ -88,6 +92,11 @@ interface WalletState {
   removePendingTx: (chainId: string, txHash: string) => void;
   /** Clear all pending txs (e.g. on lock) */
   clearPendingTxs: () => void;
+
+  /** Record an approve(spender, amount) confirmed through this wallet */
+  recordApproval: (entry: Omit<TokenApproval, 'id' | 'revokedAt'>) => void;
+  /** Flag a ledger entry revoked after the on-chain zero-approval confirmed */
+  markApprovalRevoked: (id: string, at: number) => void;
 }
 
 export const useWalletStore = create<WalletState>()(
@@ -101,6 +110,8 @@ export const useWalletStore = create<WalletState>()(
       hwAccounts: [],
 
       pendingTxs: {},
+
+      approvals: [],
 
       theme: DEFAULT_THEME,
       // Default to the device/system language; overridden by persisted
@@ -122,6 +133,7 @@ export const useWalletStore = create<WalletState>()(
           hwAccounts: [],
           activeAccountId: null,
           pendingTxs: {},
+          approvals: [],
         });
       },
 
@@ -187,6 +199,14 @@ export const useWalletStore = create<WalletState>()(
         return { pendingTxs: next };
       }),
       clearPendingTxs: () => set({ pendingTxs: {} }),
+
+      // ── Approval ledger (persisted public grants) ──
+      recordApproval: (entry) => set(state => ({
+        approvals: upsertApproval(state.approvals, entry),
+      })),
+      markApprovalRevoked: (id, at) => set(state => ({
+        approvals: markApprovalRevoked(state.approvals, id, at),
+      })),
     }),
     {
       name: `${APP_NAME}-store`,
@@ -197,6 +217,9 @@ export const useWalletStore = create<WalletState>()(
         theme: state.theme,
         language: state.language,
         activeChainId: state.activeChainId,
+        // the approval ledger records public grants this wallet signed —
+        // safe to persist and must survive locks/reloads like hwAccounts
+        approvals: state.approvals,
         // device accounts are public key + path — safe and must survive locks,
         // unlike HD accounts they are not re-derived from the mnemonic
         hwAccounts: state.hwAccounts,

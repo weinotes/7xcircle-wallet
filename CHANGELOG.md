@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Token-approval ledger with revocation (Settings → Token approvals): every
+  `approve(spender, amount)` this wallet broadcasts — from swap flows and
+  from dApp `eth_sendTransaction` calldata — is recorded (persisted, public
+  data), shown with an “∞ unlimited” risk badge, and revocable to zero
+  through the same review-and-sign pipeline as any send. Grants signed in
+  other wallets before an import are explicitly out of scope (indexer-free).
 - ENS name resolution in Send (EVM chains): type `name.eth`, get the resolved
   address reviewed before signing. Pure wire contract (EIP-137 namehash +
   two `eth_call`s), RPC failover across the configured mainnet endpoints,

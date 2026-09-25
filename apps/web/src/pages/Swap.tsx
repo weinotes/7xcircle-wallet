@@ -108,6 +108,7 @@ export function Swap() {
   const { t } = useTranslation();
 
   const accounts = useWalletStore(s => s.accounts);
+  const recordApproval = useWalletStore(s => s.recordApproval);
   const [chainId, setChainId] = useState<string>('');
 
   /**
@@ -376,6 +377,18 @@ export function Swap() {
           setStage(null);
           return;
         }
+        // Confirmed grant → the approval ledger (Approvals page can revoke
+        // exactly what this wallet just signed over to the router).
+        recordApproval({
+          chainId: active.chainId,
+          token: intents.approve.token,
+          spender: intents.approve.spender,
+          symbol: fromToken.symbol,
+          decimals: fromToken.decimals,
+          amountRaw: intents.approve.amountRaw,
+          createdAt: Math.floor(Date.now() / 1000),
+          source: 'swap',
+        });
         setStage('swap');
       }
 
@@ -395,7 +408,7 @@ export function Swap() {
       setStage(null);
       setQuoteError(err instanceof Error ? err.message : String(err));
     }
-  }, [account, adapter, active, quote, evmQuote, feeEnabled, fromToken, toToken, flow]);
+  }, [account, adapter, active, quote, evmQuote, feeEnabled, fromToken, toToken, flow, recordApproval]);
 
   // ── Render ──────────────────────────────────────────────────────────
   if (!active || !account) {
