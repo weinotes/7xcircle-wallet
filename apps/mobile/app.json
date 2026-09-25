@@ -8,7 +8,13 @@
     "scheme": "openwallet",
     "plugins": [
       "expo-local-authentication",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow 7xCircle Wallet to access the camera for scanning WalletConnect QR codes"
+        }
+      ]
     ],
     "android": {
       "package": "com.openwallet.app",

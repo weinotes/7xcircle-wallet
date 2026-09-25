@@ -23,7 +23,7 @@
 
 import { getPrivateKey, touchActivity } from '@open-wallet/core';
 import type { ChainAdapter } from '@open-wallet/core';
-import type { Account, FeeTier, TxIntent } from '@open-wallet/shared';
+import type { Account, ExternalTx, FeeTier, TxIntent } from '@open-wallet/shared';
 
 export async function sendTx(params: {
   adapter: ChainAdapter;
@@ -36,6 +36,29 @@ export async function sendTx(params: {
     from: account.address,
     feeTier,
   });
+  touchActivity();
+  const privateKey = getPrivateKey(account);
+  try {
+    const signed = await adapter.signTransaction(built, privateKey);
+    return await adapter.sendTransaction(signed);
+  } finally {
+    privateKey.fill(0);
+  }
+}
+
+/**
+ * Broadcast a transaction built OUTSIDE the wallet (a Jupiter aggregator
+ * quote): import → sign → send. Same one-shot key lifetime as sendTx —
+ * the quote is a fixed payload, so expiry means "re-quote", not rebuild.
+ */
+export async function sendExternalTx(params: {
+  adapter: ChainAdapter;
+  account: Account;
+  tx: ExternalTx;
+  feeTier?: FeeTier;
+}): Promise<string> {
+  const { adapter, account, tx, feeTier = 'normal' } = params;
+  const built = await adapter.importExternalTransaction(tx, { from: account.address, feeTier });
   touchActivity();
   const privateKey = getPrivateKey(account);
   try {

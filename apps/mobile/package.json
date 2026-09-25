@@ -7,6 +7,7 @@
     "start": "expo start",
     "android": "expo run:android",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "build": "expo export --platform android",
     "clean": "rm -rf .expo dist"
   },
@@ -14,16 +15,25 @@
     "@open-wallet/chains": "workspace:*",
     "@open-wallet/core": "workspace:*",
     "@open-wallet/shared": "workspace:*",
+    "@react-native-async-storage/async-storage": "2.1.2",
+    "@react-native-community/netinfo": "11.4.1",
+    "@walletconnect/react-native-compat": "^2.25.0",
+    "@walletconnect/sign-client": "^2.25.0",
+    "@walletconnect/types": "^2.25.0",
     "expo": "~53.0.0",
+    "expo-camera": "~16.1.11",
+    "expo-constants": "~17.1.8",
     "expo-local-authentication": "~16.0.5",
     "expo-secure-store": "~14.2.3",
     "expo-status-bar": "~2.2.3",
     "react": "19.0.0",
     "react-native": "0.79.2",
+    "react-native-get-random-values": "~1.11.0",
     "zustand": "^5.0.0"
   },
   "devDependencies": {
     "@types/react": "~19.0.10",
-    "typescript": "~5.8.3"
+    "typescript": "~5.8.3",
+    "vitest": "^2.1.0"
   }
 }

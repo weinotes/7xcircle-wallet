@@ -70,7 +70,11 @@ USDT-TRC20), BNB Chain, Solana and Ethereum first — showing adapter-discovered
 token balances and sending native or token transfers through the same
 chain-agnostic intent pipeline as the web app. It also supports optional
 fingerprint / face unlock (Keystore-gated password cache with a password
-fallback). Swap and dApp browsing are web/extension-only for now.
+fallback). The unlocked app follows the mainstream wallet layout — a bottom
+tab bar with Assets · Swap · dApps · Settings: in-app Jupiter swaps on Solana,
+dApp connections over WalletConnect v2 (QR pairing, per-request human
+approval; requires a free EXPO_PUBLIC_WC_PROJECT_ID), and an in-app update
+check against GitHub Releases.
 
 ### Browser extension
 

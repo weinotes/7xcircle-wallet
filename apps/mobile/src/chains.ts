@@ -37,3 +37,20 @@ export function orderedChains(): ChainConfig[] {
   const tail = PRODUCTION_CHAINS.filter(c => !PRIORITY_CHAIN_IDS.includes(c.chainId));
   return [...head, ...tail];
 }
+
+/**
+ * WalletConnect CAIP-2 ids look like "eip155:56" / "solana:5eykt…" —
+ * map the EVM half onto our internal chain keys. Our EVM chainIds are
+ * all "<slug>-<decimal>", so a decimal lookup is exact and total.
+ */
+export function evmChainFromCaip(caip: string): ChainConfig | undefined {
+  const match = /^eip155:(\d+)$/.exec(caip);
+  if (!match) return undefined;
+  const decimal = match[1];
+  return PRODUCTION_CHAINS.find(c => c.type === 'evm' && c.chainId.endsWith(`-${decimal}`));
+}
+
+/** Our internal key → CAIP-2 for the eip155 namespace */
+export function caipForChain(config: ChainConfig): string {
+  return `eip155:${config.chainId.split('-').pop()}`;
+}
