@@ -1,6 +1,32 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+
+# Security overrides (pnpm 11 reads these here — the old `pnpm.overrides`
+# field in package.json is no longer read and was silently ignored).
+# Floors land on the first patched release of each advisory via transitive
+# deps we do not control: axios ← @ledgerhq/*, ini ← rc (mobile toolchain),
+# ansi-regex ← strip-ansi, postcss ← Expo/Metro tooling.
+overrides:
+  'axios': '^1.18.0'
+  'ini@<1.3.6': '1.3.8'
+  'ansi-regex@4': '4.1.1'
+  'postcss@<8.5.10': '8.5.28'
+
+# Accepted audit exceptions — each one has no usable patched release, verified
+# 2026-09; re-check when the upstream toolchain upgrades:
+#   elliptic      <=6.6.1  patched 6.6.2 was never published (npm latest 6.6.1)
+#   bigint-buffer 1.1.5    latest published; call sites decode fixed 8/16-byte
+#                          layouts so input length is not attacker-controlled
+#   stream-json   1.9.1    patched 3.4.1+ is ESM-only and breaks jayson's CJS
+#                          require; jayson imports StreamValues/Verifier only —
+#                          none of the affected pick/ignore/filter/replace filters
+#   image-size    1.2.1    patched 2.0.3+ is not callable from CJS while metro
+#                          does require('image-size')(buffer); metro is dev-only
+#                          bundler tooling, never part of shipped builds
+#   uuid          7/8      advisory needs v3/v5/v6 with a caller-supplied buf;
+#                          both consumers (xcode, jayson) call v4 only
+
 allowBuilds:
   # bigint-buffer ships an OPTIONAL native addon compiled with node-gyp.
   # Disabled: the pure-JS fallback is what already runs (spl-token prints
