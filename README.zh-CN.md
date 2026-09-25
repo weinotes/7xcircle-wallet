@@ -67,7 +67,7 @@ Android 客户端使用 Expo / React Native，并复用同一套钱包核心和�
 移动端现已覆盖全部主网链（切换器以 TRON（TRX + USDT-TRC20）、BNB Chain、Solana、
 Ethereum 优先排列），展示各链适配器发现的代币余额，原生与代币转账走与 Web 端相同的
 链无关 intent 流水线；并支持可选的指纹/面容解锁（密码缓存由 Android Keystore 生物识别
-门锁保护，密码始终作为兜底通道）。解锁后的界面遵循主流钱包布局——底部四 Tab：资产 / 兑换 / dApp / 设置：应用内 Solana Jupiter 兑换、通过 WalletConnect v2 连接 dApp（扫码配对、逐请求人工审批；需配置免费的 EXPO_PUBLIC_WC_PROJECT_ID）、以及基于 GitHub Releases 的应用内在线升级检查。
+门锁保护，密码始终作为兜底通道）。解锁后的界面遵循主流钱包布局——底部四 Tab：资产 / 兑换 / dApp / 设置：应用内 Solana Jupiter 兑换、通过 WalletConnect v2 连接 dApp（扫码配对、逐请求人工审批；内置 relay 项目 ID，可用 EXPO_PUBLIC_WC_PROJECT_ID 覆盖）、以及基于 GitHub Releases 的应用内在线升级检查。
 
 ### 浏览器插件
 

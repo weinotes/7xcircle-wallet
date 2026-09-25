@@ -73,7 +73,8 @@ fingerprint / face unlock (Keystore-gated password cache with a password
 fallback). The unlocked app follows the mainstream wallet layout — a bottom
 tab bar with Assets · Swap · dApps · Settings: in-app Jupiter swaps on Solana,
 dApp connections over WalletConnect v2 (QR pairing, per-request human
-approval; requires a free EXPO_PUBLIC_WC_PROJECT_ID), and an in-app update
+approval; ships with a built-in relay project id, overridable via
+EXPO_PUBLIC_WC_PROJECT_ID), and an in-app update
 check against GitHub Releases.
 
 ### Browser extension

@@ -16,14 +16,14 @@
 /**
  * Build-time configuration for the mobile app.
  *
- * WC_PROJECT_ID gates WalletConnect relay access — it is free to obtain at
- * https://cloud.reown.com (create project → copy Project ID) and MUST be
- * filled in before dApp connections can work. Empty keeps the app fully
- * functional everywhere else; the dApps tab explains the missing knob
- * instead of failing with an opaque relay error.
+ * WC_PROJECT_ID gates WalletConnect relay access. A project id is a
+ * public app identifier (NOT a secret — the JWT secret stays server-side),
+ * so it ships embedded and every install works out of the box; forkers
+ * override via EXPO_PUBLIC_WC_PROJECT_ID (https://cloud.reown.com).
  */
 
-export const WC_PROJECT_ID = process.env.EXPO_PUBLIC_WC_PROJECT_ID ?? '';
+export const WC_PROJECT_ID =
+  process.env.EXPO_PUBLIC_WC_PROJECT_ID ?? 'd25074d0f01af6f931e26082b3137aee';
 
 /** GitHub source of truth for the in-app update check */
 export const UPDATE_REPO = 'weinotes/7xcircle-wallet';
