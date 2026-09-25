@@ -60,6 +60,7 @@ import type {
   FeeEstimate,
   FeeTier,
   SignedTransaction,
+  SimulationResult,
   TokenBalance,
   TransactionRecord,
   TxIntent,
@@ -613,6 +614,94 @@ export class EvmAdapter implements ChainAdapter {
   /** Current block number */
   async getBlockHeight(): Promise<number> {
     return Number(await this.publicClient.getBlockNumber());
+  }
+
+  /**
+   * Simulate a transaction before signing — a pre-flight check.
+   *
+   * Uses `eth_call` (no gas, no signature) to ask the chain "would you
+   * accept this?". If the call reverts, the transaction would fail on-chain
+   * and signing it would waste gas. Token changes are derived from the
+   * intent (what we know we're sending), not from a full trace.
+   *
+   * Returns `null` only if the RPC does not support `eth_call` (very rare
+   * on modern nodes) — the UI must then show "simulation unavailable".
+   */
+  async simulateTransaction(intent: TxIntent, opts: BuildOpts): Promise<SimulationResult | null> {
+    const call = compileIntent(intent);
+    const tokenChanges: SimulationResult['tokenChanges'] = [];
+    const warnings: string[] = [];
+
+    try {
+      // eth_call: no gas, no signature, no state mutation. Just "would this work?"
+      await this.publicClient.call({
+        account: opts.from as Address,
+        to: call.to as Address,
+        value: call.value ? BigInt(call.value) : undefined,
+        data: call.data as Hex | undefined,
+      });
+    } catch (err) {
+      // Revert or RPC error — the transaction would fail on-chain
+      const reason = err instanceof Error ? err.message : 'Unknown simulation error';
+      return {
+        success: false,
+        error: reason,
+        tokenChanges: [],
+        warnings: [],
+      };
+    }
+
+    // Simulation succeeded — derive token changes from the intent
+    switch (intent.kind) {
+      case 'native-transfer':
+        tokenChanges.push({
+          symbol: this.config.nativeSymbol,
+          address: 'native',
+          decimals: this.config.nativeDecimals,
+          amountRaw: intent.amountRaw,
+          direction: 'out',
+        });
+        break;
+
+      case 'token-transfer':
+        tokenChanges.push({
+          symbol: 'TOKEN', // caller resolves via getTokenInfo if needed
+          address: intent.token,
+          decimals: intent.decimals,
+          amountRaw: intent.amountRaw,
+          direction: 'out',
+        });
+        break;
+
+      case 'approve':
+        tokenChanges.push({
+          symbol: 'TOKEN',
+          address: intent.token,
+          decimals: 18, // ERC20 default; caller overrides with getTokenInfo
+          amountRaw: intent.amountRaw,
+          direction: 'out', // approval is a "permission out", not a transfer
+        });
+        // Warn on very large approvals (max uint256 or near it)
+        if (BigInt(intent.amountRaw) > 2n ** 128n) {
+          warnings.push('Large approval: spender can move a very large amount of your tokens');
+        }
+        break;
+
+      case 'contract-call':
+        // Generic contract call — we know the value sent, but not the token changes
+        if (intent.valueRaw && BigInt(intent.valueRaw) > 0n) {
+          tokenChanges.push({
+            symbol: this.config.nativeSymbol,
+            address: 'native',
+            decimals: this.config.nativeDecimals,
+            amountRaw: intent.valueRaw,
+            direction: 'out',
+          });
+        }
+        break;
+    }
+
+    return { success: true, tokenChanges, warnings };
   }
 
   /** Convert a human-readable amount to raw wei */

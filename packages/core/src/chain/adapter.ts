@@ -29,6 +29,7 @@ import type {
   FeeEstimate,
   FeeTier,
   SignedTransaction,
+  SimulationResult,
   TokenBalance,
   TokenInfo,
   TransactionRecord,
@@ -199,4 +200,18 @@ export interface ChainAdapter {
    * harmless and useful elsewhere.
    */
   getBlockHeight(): Promise<number>;
+
+  /**
+   * Simulate a transaction before signing — a pre-flight check.
+   *
+   * Returns `null` when the chain does not support simulation (e.g., some
+   * legacy RPCs) or the adapter has not implemented it. The UI must then
+   * show "simulation unavailable" rather than "safe".
+   *
+   * When supported, returns whether the chain would accept the transaction
+   * (no revert), the expected token changes (derived from the intent), and
+   * any non-fatal warnings. A failed simulation means the transaction would
+   * revert on-chain — signing it would waste gas.
+   */
+  simulateTransaction?(intent: TxIntent, opts: BuildOpts): Promise<SimulationResult | null>;
 }

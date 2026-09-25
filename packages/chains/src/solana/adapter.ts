@@ -57,6 +57,7 @@ import type {
   FeeEstimate,
   FeeTier,
   SignedTransaction,
+  SimulationResult,
   TokenBalance,
   TokenInfo,
   TransactionRecord,
@@ -600,6 +601,102 @@ export class SolanaAdapter implements ChainAdapter {
   /** Current slot height — used to detect blockhash expiry */
   async getBlockHeight(): Promise<number> {
     return this.connection.getBlockHeight('confirmed');
+  }
+
+  /**
+   * Simulate a transaction before signing — a pre-flight check.
+   *
+   * Compiles the intent into a v0 transaction, then asks the Solana cluster
+   * "would this succeed?" via `simulateTransaction`. If the simulation
+   * returns an error, the transaction would fail on-chain and signing it
+   * would waste the transaction fee (5000 lamports + priority fee).
+   *
+   * Token changes are derived from the intent (what we know we're sending),
+   * not from log parsing (which would require decoding program logs).
+   */
+  async simulateTransaction(intent: TxIntent, opts: BuildOpts): Promise<SimulationResult | null> {
+    const payer = new PublicKey(opts.from);
+    const feeTier = opts.feeTier ?? 'normal';
+    const tokenChanges: SimulationResult['tokenChanges'] = [];
+    const warnings: string[] = [];
+
+    try {
+      const ctx: CompileContext = {
+        destinationAtaExists: await this.destinationAtaExists(intent),
+      };
+      const ixs = await compileIntent(intent, payer, ctx);
+      const priceMicroLamports = await this.resolvePriorityFee(
+        this.collectWritableAccounts(ixs),
+        feeTier,
+      );
+
+      // Build a v0 message with the current blockhash
+      const { blockhash } = await this.connection.getLatestBlockhash('confirmed');
+      const messageV0 = new TransactionMessage({
+        payerKey: payer,
+        recentBlockhash: blockhash,
+        instructions: [
+          ComputeBudgetProgram.setComputeUnitLimit({ units: COMPUTE_UNIT_LIMIT[intent.kind] }),
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priceMicroLamports }),
+          ...ixs,
+        ],
+      }).compileToV0Message();
+
+      const versionedTx = new VersionedTransaction(messageV0);
+      const result = await this.connection.simulateTransaction(versionedTx, {
+        sigVerify: false,
+        replaceRecentBlockhash: true,
+      });
+
+      if (result.value.err) {
+        const logs = result.value.logs?.join('\n') ?? 'No logs';
+        return {
+          success: false,
+          error: `Solana simulation failed: ${JSON.stringify(result.value.err)}\n${logs}`,
+          tokenChanges: [],
+          warnings: [],
+        };
+      }
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : 'Unknown simulation error';
+      return {
+        success: false,
+        error: reason,
+        tokenChanges: [],
+        warnings: [],
+      };
+    }
+
+    // Simulation succeeded — derive token changes from the intent
+    switch (intent.kind) {
+      case 'native-transfer':
+        tokenChanges.push({
+          symbol: this.config.nativeSymbol,
+          address: 'native',
+          decimals: this.config.nativeDecimals,
+          amountRaw: intent.amountRaw,
+          direction: 'out',
+        });
+        break;
+
+      case 'token-transfer':
+        tokenChanges.push({
+          symbol: 'TOKEN', // caller resolves via getTokenInfo if needed
+          address: intent.token,
+          decimals: intent.decimals,
+          amountRaw: intent.amountRaw,
+          direction: 'out',
+        });
+        break;
+
+      case 'contract-call':
+      case 'approve':
+        // Solana has no approval concept; contract-call is generic
+        warnings.push('Solana simulation preview only — review the transaction details carefully');
+        break;
+    }
+
+    return { success: true, tokenChanges, warnings };
   }
 
   // ─── Internals ─────────────────────────────────────────────────────

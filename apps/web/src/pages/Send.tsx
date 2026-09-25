@@ -37,11 +37,12 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, ArrowRight, Loader2, CheckCircle2, XCircle, Coins, Wallet, ChevronDown, ListPlus, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, CheckCircle2, XCircle, Coins, Wallet, ChevronDown, ListPlus, ShieldAlert, AlertTriangle } from 'lucide-react';
 import { Button, Input, Modal } from '@7xcircle/ui';
 import { chainRegistry } from '@7xcircle/core';
 import { useTransactionHistory } from '../hooks/useTransactionHistory.js';
 import { useWalletStore, selectActiveAccount } from '../store/wallet.js';
+import type { SimulationResult } from '@7xcircle/shared';
 import {
   CHAIN_CONFIGS,
   DEFAULT_DURATION_SEC,
@@ -184,6 +185,13 @@ export function Send() {
   const [rentalStep, setRentalStep] = useState<RentalStep>('idle');
   const [rentalError, setRentalError] = useState<string | null>(null);
   const [rentalOrder, setRentalOrder] = useState<ResourceOrder | null>(null);
+  /**
+   * Pre-sign simulation result. Triggered when the user clicks "Review".
+   * `null` = adapter does not support simulation; the UI shows a soft
+   * warning. `{ success: false }` = the chain would reject this tx — the
+   * confirm button is disabled so the user cannot waste gas signing it.
+   */
+  const [simulation, setSimulation] = useState<SimulationResult | null | undefined>(undefined);
   const rentalAlive = useRef(true);
   useEffect(() => {
     rentalAlive.current = true;
@@ -1398,7 +1406,39 @@ export function Send() {
       {!showConfirm && !['building', 'signing', 'broadcasting', 'pending'].includes(status) && (
         <Button
           disabled={!!validationError || status !== 'ready' || (tokenMode === 'erc20' && !tokenInfo)}
-          onClick={() => setShowConfirm(true)}
+          onClick={async () => {
+            // Run pre-sign simulation before opening the confirm modal.
+            // If the adapter doesn't support it, `null` is returned and the
+            // modal shows a soft "simulation unavailable" warning instead.
+            if (adapter?.simulateTransaction && fromAccount) {
+              setSimulation(undefined); // reset to trigger spinner
+              try {
+                const rawAmount = sendToken.isNative
+                  ? adapter.parseAmount(amount)
+                  : adapter.parseTokenAmount(amount, sendToken.decimals);
+                const intent: TxIntent = sendToken.isNative
+                  ? { kind: 'native-transfer', to: toAddress, amountRaw: rawAmount }
+                  : {
+                      kind: 'token-transfer',
+                      token: sendToken.address,
+                      decimals: sendToken.decimals,
+                      to: toAddress,
+                      amountRaw: rawAmount,
+                    };
+                const result = await adapter.simulateTransaction(intent, {
+                  from: fromAccount.address,
+                  feeTier,
+                });
+                setSimulation(result);
+              } catch {
+                // Simulation error = treat as unavailable (soft warning)
+                setSimulation(null);
+              }
+            } else {
+              setSimulation(null);
+            }
+            setShowConfirm(true);
+          }}
           size="lg"
         >
           {t('send.reviewTransaction')} <ArrowRight size={16} />
@@ -1413,7 +1453,12 @@ export function Send() {
         footer={
           <>
             <Button variant="secondary" onClick={() => setShowConfirm(false)}>{t('common.cancel')}</Button>
-            <Button variant="danger" onClick={handleSend} loading={status === 'signing'}>
+            <Button
+              variant="danger"
+              onClick={handleSend}
+              loading={status === 'signing'}
+              disabled={simulation !== undefined && simulation !== null && !simulation.success}
+            >
               {t('send.confirmAndSend')}
             </Button>
           </>
@@ -1468,6 +1513,103 @@ export function Send() {
           <div style={{ borderTop: '1px solid var(--ow-border-subtle)', paddingTop: 'var(--ow-space-3)', color: 'var(--ow-error)', fontSize: 'var(--ow-font-size-xs)' }}>
             {t('send.doubleCheck')}
           </div>
+
+          {/* ── Simulation result ─────────────────────────────────────── */}
+          {simulation === undefined && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 'var(--ow-space-2)',
+              fontSize: 'var(--ow-font-size-sm)', color: 'var(--ow-text-tertiary)',
+              padding: 'var(--ow-space-3)',
+              backgroundColor: 'var(--ow-bg-tertiary)',
+              borderRadius: 'var(--ow-radius-sm)',
+            }}>
+              <Loader2 size={14} style={{ animation: 'ow-spin 1s linear infinite' }} />
+              {t('send.simulating')}
+            </div>
+          )}
+          {simulation === null && (
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 'var(--ow-space-2)',
+              fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-text-secondary)',
+              padding: 'var(--ow-space-3)',
+              backgroundColor: 'var(--ow-bg-tertiary)',
+              borderRadius: 'var(--ow-radius-sm)',
+              border: '1px solid var(--ow-border-subtle)',
+            }}>
+              <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+              <div>{t('send.simulationUnavailable')}</div>
+            </div>
+          )}
+          {simulation && !simulation.success && (
+            <div style={{
+              display: 'flex', flexDirection: 'column', gap: 'var(--ow-space-2)',
+              fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-error)',
+              padding: 'var(--ow-space-3)',
+              backgroundColor: 'var(--ow-error-bg, rgba(255,59,48,0.08))',
+              borderRadius: 'var(--ow-radius-sm)',
+              border: '1px solid var(--ow-error)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--ow-space-2)', fontWeight: 600 }}>
+                <XCircle size={14} /> {t('send.simulationFailed')}
+              </div>
+              <div>{t('send.simulationFailedDesc')}</div>
+              <code style={{
+                fontFamily: 'var(--ow-font-mono)',
+                fontSize: 'var(--ow-font-size-xs)',
+                wordBreak: 'break-all',
+                padding: 'var(--ow-space-2)',
+                backgroundColor: 'var(--ow-bg-primary)',
+                borderRadius: 'var(--ow-radius-sm)',
+              }}>
+                {simulation.error?.slice(0, 200)}
+              </code>
+            </div>
+          )}
+          {simulation && simulation.success && (
+            <div style={{
+              display: 'flex', flexDirection: 'column', gap: 'var(--ow-space-2)',
+              fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-success)',
+              padding: 'var(--ow-space-3)',
+              backgroundColor: 'var(--ow-success-bg, rgba(52,199,89,0.08))',
+              borderRadius: 'var(--ow-radius-sm)',
+              border: '1px solid var(--ow-success)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--ow-space-2)', fontWeight: 600 }}>
+                <CheckCircle2 size={14} /> {t('send.simulationOk')}
+              </div>
+              {simulation.tokenChanges.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ color: 'var(--ow-text-secondary)' }}>{t('send.simulationOkDesc')}</div>
+                  {simulation.tokenChanges.map((tc, i) => (
+                    <div key={i} style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: 'var(--ow-space-2)',
+                      backgroundColor: 'var(--ow-bg-primary)',
+                      borderRadius: 'var(--ow-radius-sm)',
+                    }}>
+                      <span>{t('send.tokenChangeOut')}</span>
+                      <span style={{ fontFamily: 'var(--ow-font-mono)', fontWeight: 600 }}>
+                        {formatBalance(tc.amountRaw, tc.decimals, 6)} {tc.symbol}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {simulation.warnings.length > 0 && (
+                <div style={{
+                  display: 'flex', flexDirection: 'column', gap: 4,
+                  color: 'var(--ow-text-secondary)',
+                }}>
+                  {simulation.warnings.map((w, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                      <AlertTriangle size={12} style={{ flexShrink: 0, marginTop: 2 }} />
+                      <span>{w}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </Modal>
     </div>

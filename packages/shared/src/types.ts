@@ -230,3 +230,38 @@ export interface ChainConfig {
   icon?: string;
   testnet?: boolean;
 }
+
+/**
+ * Result of simulating a transaction before signing.
+ *
+ * This is a pre-flight check: does the chain accept the transaction as-is?
+ * If `success` is false, the transaction would revert on-chain and should
+ * NOT be signed. The UI shows `error` to the user so they understand why.
+ *
+ * `tokenChanges` is derived from the intent (what we know we're sending),
+ * not from a full trace (which would require `debug_traceCall` on EVM or
+ * log decoding on Solana). It's a "what you expect" preview, not a full
+ * balance-change decode — that's a future enhancement.
+ *
+ * `warnings` catches non-fatal issues: large approvals, unknown spenders,
+ * or chains that don't support simulation (returns `null` instead).
+ */
+export interface SimulationResult {
+  /** True if the chain accepted the transaction (no revert) */
+  success: boolean;
+  /** Revert reason or simulation error, if `success` is false */
+  error?: string;
+  /**
+   * Expected token balance changes. Each entry is the raw amount (smallest
+   * unit) the user will pay or receive. `direction` encodes in/out.
+   */
+  tokenChanges: Array<{
+    symbol: string;
+    address: string; // 'native' for chain native token
+    decimals: number;
+    amountRaw: string;
+    direction: 'in' | 'out';
+  }>;
+  /** Non-fatal warnings (e.g., large approval, simulation not supported) */
+  warnings: string[];
+}
