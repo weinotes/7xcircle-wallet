@@ -24,7 +24,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { SimulationResult } from '@7xcircle/shared';
+import type { SimulationResult } from './types.js';
 
 describe('SimulationResult type contract', () => {
   it('accepts a successful result with token changes', () => {
