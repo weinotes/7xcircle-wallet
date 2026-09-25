@@ -73,6 +73,7 @@ export function Home() {
   const [tokensError, setTokensError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [chainOpen, setChainOpen] = useState(false);
+  const [addAccountError, setAddAccountError] = useState<string | null>(null);
   // "All chains" is a local VIEW — the store's activeChainId keeps pointing
   // at a real chain so Send/Swap/recent-tx semantics never have to special
   // case a pseudo-chain.
@@ -400,7 +401,15 @@ export function Home() {
           })}
           <button
             type="button"
-            onClick={() => addAccount(activeChainId)}
+            onClick={() => {
+              setAddAccountError(null);
+              try {
+                addAccount(activeChainId);
+              } catch (err) {
+                console.error('[addAccount] failed:', err);
+                setAddAccountError(err instanceof Error ? err.message : 'Failed to add account');
+              }
+            }}
             style={{
               padding: '4px 10px',
               borderRadius: 'var(--ow-radius-full)',
@@ -414,6 +423,11 @@ export function Home() {
           >
             {t('home.addAccount')}
           </button>
+          {addAccountError && (
+            <span style={{ fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-error)' }}>
+              {addAccountError}
+            </span>
+          )}
         </div>
       )}
 
