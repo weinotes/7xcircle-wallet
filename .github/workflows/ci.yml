@@ -28,7 +28,13 @@ jobs:
           fetch-depth: 0
       - name: Scan pushed diff
         run: |
-          git diff HEAD~5..HEAD -- . ':!node_modules' ':!pnpm-lock.yaml' | \
+          # Exclude test files (they contain known test vectors — tx hashes,
+          # EIP-712 digests — that are 64-char hex but NOT secrets).
+          # Also exclude lockfiles and node_modules.
+          git diff HEAD~5..HEAD -- . \
+            ':!node_modules' ':!pnpm-lock.yaml' \
+            ':!*.test.*' ':!*.spec.*' \
+            ':!scripts/*-test.ts' ':!scripts/ens-test.ts' | \
             grep -nE '(sk-[A-Za-z0-9]{16,}|0x[0-9a-fA-F]{64}|BEGIN (RSA|OPENSSH|EC|DSA) PRIVATE KEY|api[_-]?key[[:space:]]*=[[:space:]]*["'"'"'][^"'"'"']{8,})' \
             && { echo '❌ Potential secret in diff'; exit 1; } || echo '✅ No secrets in diff'
       - name: Scan working tree
