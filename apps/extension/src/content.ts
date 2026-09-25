@@ -30,7 +30,9 @@ script.onload = () => script.remove();
 
 interface InpageRequest {
   source: '7xcircle-inpage';
-  id: number;
+  // inpage.js generates 32-char hex ids (crypto.getRandomValues), not the
+  // old nextId++ numbers — keep the bridge typing in sync with the producer.
+  id: string;
   request: { method?: string; params?: unknown[] };
 }
 
@@ -56,7 +58,7 @@ window.addEventListener('message', event => {
         }, '*');
         return;
       }
-      const res = response as { id?: number; result?: unknown; error?: unknown };
+      const res = response as { id?: string; result?: unknown; error?: unknown };
       window.postMessage({
         source: '7xcircle-content',
         id,

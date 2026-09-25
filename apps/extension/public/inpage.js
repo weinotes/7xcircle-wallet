@@ -27,10 +27,11 @@
   if (window.__7xcircleInjected) return;
   window.__7xcircleInjected = true;
 
-  // SECURITY: Use cryptographically random IDs to prevent page scripts from
-  // forging responses. Predictable numeric IDs (nextId++) let any script on
-  // the same page post a fake `source: '7xcircle-content'` message and
-  // inject attacker-controlled results (e.g. fake eth_accounts).
+  // SECURITY: IDs are cryptographically random hex instead of predictable
+  // nextId++ counters. Same-page scripts share this window's message bus, so
+  // a determined script can still observe a request and race a forged reply —
+  // randomness only removes the trivially guessable/colliding id surface.
+  // The real trust boundary is in the background (user approval), not here.
   var pending = {};
   var listeners = {};
   var connectedAccounts = [];

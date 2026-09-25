@@ -27,14 +27,33 @@ jobs:
         with:
           fetch-depth: 0
       - name: Scan pushed diff
+        env:
+          # What this push/PR actually introduces. A fixed `HEAD~5..HEAD`
+          # window silently missed secrets pushed 6+ commits ago and
+          # rescanned already-reviewed history.
+          PUSH_BEFORE: ${{ github.event.before }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
         run: |
+          # `event.before` is all-zeros on a branch's first push; fall back to
+          # the PR base, then the merge-base with main, then HEAD (empty diff).
+          ZERO=0000000000000000000000000000000000000000
+          BASE="$PUSH_BEFORE"
+          if [ -z "$BASE" ] || [ "$BASE" = "$ZERO" ]; then
+            BASE="$PR_BASE"
+          fi
+          if [ -z "$BASE" ] || [ "$BASE" = "$ZERO" ]; then
+            BASE=$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse --verify HEAD~5 2>/dev/null || git rev-parse HEAD)
+          fi
+          echo "Scanning ${BASE}..HEAD"
           # Exclude test files (they contain known test vectors — tx hashes,
           # EIP-712 digests — that are 64-char hex but NOT secrets).
           # Also exclude lockfiles and node_modules.
-          git diff HEAD~5..HEAD -- . \
+          DIFF=$(git diff "$BASE..HEAD" -- . \
             ':!node_modules' ':!pnpm-lock.yaml' \
             ':!*.test.*' ':!*.spec.*' \
-            ':!scripts/*-test.ts' ':!scripts/ens-test.ts' | \
+            ':!scripts/*-test.ts' ':!scripts/ens-test.ts') \
+            || { echo '❌ git diff failed — refusing to pass silently'; exit 1; }
+          echo "$DIFF" | \
             grep -nE '(sk-[A-Za-z0-9]{16,}|0x[0-9a-fA-F]{64}|BEGIN (RSA|OPENSSH|EC|DSA) PRIVATE KEY|api[_-]?key[[:space:]]*=[[:space:]]*["'"'"'][^"'"'"']{8,})' \
             && { echo '❌ Potential secret in diff'; exit 1; } || echo '✅ No secrets in diff'
       - name: Scan working tree
