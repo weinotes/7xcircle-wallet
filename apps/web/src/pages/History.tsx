@@ -25,11 +25,11 @@
  * renders the unified TransactionRecord shape.
  */
 
-import { useEffect, useMemo, useState, type JSX } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, ArrowUpRight, ArrowDownRight, Clock, CheckCircle2, XCircle, RefreshCw, ExternalLink } from 'lucide-react';
-import { Button } from '@open-wallet/ui';
+import { ArrowLeft, ArrowUpRight, ArrowDownRight, Clock, CheckCircle2, XCircle, RefreshCw, ExternalLink, Inbox } from 'lucide-react';
+import { Button, IconButton, Card, Skeleton, EmptyState } from '@open-wallet/ui';
 import { useWalletStore } from '../store/wallet.js';
 import { CHAIN_CONFIGS } from '@open-wallet/chains';
 import { useTransactionHistory } from '../hooks/useTransactionHistory.js';
@@ -60,20 +60,20 @@ function formatTime(ts: number, t: (key: string, opts?: Record<string, unknown>)
 function StatusBadge({ status, t }: { status: TransactionRecord['status']; t: (key: string) => string }) {
   const styles: Record<TransactionRecord['status'], { bg: string; color: string; icon: JSX.Element; label: string }> = {
     pending: {
-      bg: 'rgba(245, 158, 11, 0.12)',
-      color: '#f59e0b',
+      bg: 'var(--ow-pending-bg)',
+      color: 'var(--ow-pending)',
       icon: <Clock size={12} />,
       label: t('history.pending'),
     },
     confirmed: {
-      bg: 'rgba(16, 185, 129, 0.12)',
-      color: '#10b981',
+      bg: 'var(--ow-success-bg)',
+      color: 'var(--ow-positive)',
       icon: <CheckCircle2 size={12} />,
       label: t('history.confirmed'),
     },
     failed: {
-      bg: 'rgba(239, 68, 68, 0.12)',
-      color: '#ef4444',
+      bg: 'var(--ow-error-bg)',
+      color: 'var(--ow-negative)',
       icon: <XCircle size={12} />,
       label: t('history.failed'),
     },
@@ -85,8 +85,8 @@ function StatusBadge({ status, t }: { status: TransactionRecord['status']; t: (k
       alignItems: 'center',
       gap: 4,
       padding: '2px 8px',
-      borderRadius: 12,
-      fontSize: 11,
+      borderRadius: 'var(--ow-radius-full)',
+      fontSize: 'var(--ow-font-size-xs)',
       fontWeight: 600,
       backgroundColor: s.bg,
       color: s.color,
@@ -146,42 +146,48 @@ export function History() {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 'var(--ow-space-3)',
     padding: '14px 16px',
-    backgroundColor: status === 'pending' ? 'rgba(245, 158, 11, 0.04)' : 'var(--ow-bg-secondary)',
+    backgroundColor: status === 'pending' ? 'var(--ow-pending-bg)' : 'var(--ow-bg-secondary)',
     borderRadius: 'var(--ow-radius-lg)',
-    border: status === 'pending' ? '1px solid rgba(245, 158, 11, 0.25)' : '1px solid var(--ow-border)',
-    transition: 'background-color 150ms',
+    border: status === 'pending' ? '1px solid var(--ow-pending)' : '1px solid var(--ow-border)',
+    transition: 'background-color var(--ow-duration-fast) var(--ow-ease)',
   });
 
   return (
     <div style={cardStyle}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--ow-space-3)' }}>
-        <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-          <ArrowLeft size={16} />
-        </Button>
-        <div style={{ flex: 1, fontSize: 'var(--ow-font-size-xl)', fontWeight: 700 }}>{t('history.title')}</div>
-        <Button variant="ghost" size="sm" onClick={refresh} disabled={loading}>
-          <RefreshCw size={16} style={loading ? { animation: 'spin 1s linear infinite' } : undefined} />
-        </Button>
+      <div className="ow-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--ow-space-2)' }}>
+          <IconButton aria-label={t('common.back')} onClick={() => navigate(-1)}>
+            <ArrowLeft size={16} />
+          </IconButton>
+          <div style={{ fontSize: 'var(--ow-font-size-xl)', fontWeight: 700 }}>{t('history.title')}</div>
+        </div>
+        <IconButton aria-label={t('history.refreshAria')} onClick={refresh} disabled={loading}>
+          <RefreshCw size={16} style={loading ? { animation: 'ow-spin 1s linear infinite' } : undefined} />
+        </IconButton>
       </div>
 
       {/* Chain label */}
-      <div style={{ fontSize: 13, color: 'var(--ow-text-secondary)' }}>
-        {activeChain?.name ?? activeChainId} · {fromAccount ? truncateHash(fromAccount.address) : '—'}
+      <div style={{ fontSize: 'var(--ow-font-size-sm)', color: 'var(--ow-text-secondary)' }}>
+        {activeChain?.name ?? activeChainId} · <span className="ow-mono">{fromAccount ? truncateHash(fromAccount.address) : '—'}</span>
       </div>
 
       {/* Error state */}
       {error && (
-        <div style={{
+        <div role="alert" style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--ow-space-3)',
           padding: 'var(--ow-space-3) var(--ow-space-4)',
           borderRadius: 'var(--ow-radius-lg)',
-          backgroundColor: 'rgba(239, 68, 68, 0.1)',
-          color: '#ef4444',
+          backgroundColor: 'var(--ow-error-bg)',
+          color: 'var(--ow-negative-fg)',
           fontSize: 'var(--ow-font-size-sm)',
         }}>
           {t('history.failedToLoad', { error })}
-          <Button variant="ghost" size="sm" onClick={refresh} style={{ marginLeft: 'auto', display: 'block' }}>
+          <Button variant="ghost" size="sm" onClick={refresh} style={{ marginLeft: 'auto', flexShrink: 0 }}>
             {t('common.retry')}
           </Button>
         </div>
@@ -189,35 +195,23 @@ export function History() {
 
       {/* Empty state */}
       {!loading && !error && transactions.length === 0 && (
-        <div style={{
-          backgroundColor: 'var(--ow-bg-secondary)',
-          borderRadius: 'var(--ow-radius-xl)',
-          border: '1px solid var(--ow-border)',
-          padding: 'var(--ow-space-12)',
-          textAlign: 'center',
-          color: 'var(--ow-text-secondary)',
-        }}>
-          <div style={{ fontSize: 'var(--ow-font-size-lg)', fontWeight: 600, marginBottom: 'var(--ow-space-2)', color: 'var(--ow-text-primary)' }}>
-            {t('history.noTxTitle')}
-          </div>
-          <div style={{ fontSize: 'var(--ow-font-size-sm)', marginBottom: 'var(--ow-space-4)' }}>
-            {t('history.noTxDesc', { chain: activeChain?.name ?? '' })}
-          </div>
-          <Button onClick={() => navigate('/send')}>{t('history.send', { symbol: activeChain?.nativeSymbol ?? '' })}</Button>
-        </div>
+        <Card>
+          <EmptyState
+            icon={<Inbox size={28} />}
+            title={t('history.noTxTitle')}
+            description={t('history.noTxDesc', { chain: activeChain?.name ?? '' })}
+            action={
+              <Button onClick={() => navigate('/send')}>{t('history.send', { symbol: activeChain?.nativeSymbol ?? '' })}</Button>
+            }
+          />
+        </Card>
       )}
 
       {/* Loading skeleton */}
       {loading && transactions.length === 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }} aria-label={t('common.loading')}>
           {[1, 2, 3, 4].map(i => (
-            <div key={i} style={{
-              height: 58,
-              borderRadius: 'var(--ow-radius-lg)',
-              backgroundColor: 'var(--ow-bg-secondary)',
-              border: '1px solid var(--ow-border)',
-              animation: 'pulse 1.5s ease-in-out infinite',
-            }} />
+            <Skeleton key={i} height={58} style={{ borderRadius: 'var(--ow-radius-lg)' }} />
           ))}
         </div>
       )}
@@ -233,16 +227,17 @@ export function History() {
             return (
               <div key={tx.hash} style={listItemStyle(tx.status)}>
                 {/* Left: direction icon + status */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                   <div style={{
                     width: 36,
                     height: 36,
-                    borderRadius: '50%',
-                    backgroundColor: tx.direction === 'sent' ? 'rgba(239, 68, 68, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+                    flexShrink: 0,
+                    borderRadius: 'var(--ow-radius-full)',
+                    backgroundColor: tx.direction === 'sent' ? 'var(--ow-error-bg)' : 'var(--ow-success-bg)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: tx.direction === 'sent' ? '#ef4444' : '#10b981',
+                    color: tx.direction === 'sent' ? 'var(--ow-negative)' : 'var(--ow-positive)',
                   }}>
                     {tx.direction === 'sent' ? <ArrowUpRight size={18} /> : <ArrowDownRight size={18} />}
                   </div>
@@ -277,15 +272,15 @@ export function History() {
                 </div>
 
                 {/* Right: amount */}
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div className="ow-mono" style={{
                     fontWeight: 600,
-                    fontSize: 15,
-                    color: amt.isPositive ? '#10b981' : 'var(--ow-text-primary)',
+                    fontSize: 'var(--ow-font-size-base)',
+                    color: amt.isPositive ? 'var(--ow-positive-fg)' : 'var(--ow-text-primary)',
                   }}>
                     {amt.isPositive ? '+' : '-'}{amt.text}
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--ow-text-secondary)' }}>
+                  <div style={{ fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-text-secondary)' }}>
                     {amt.symbol}
                   </div>
                 </div>
@@ -297,9 +292,9 @@ export function History() {
 
       {/* Footer */}
       {transactions.length > 0 && (
-        <div style={{ fontSize: 12, color: 'var(--ow-text-secondary)', textAlign: 'center', marginTop: 'var(--ow-space-2)' }}>
+        <div style={{ fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-text-secondary)', textAlign: 'center', marginTop: 'var(--ow-space-2)' }}>
           {t('history.showing', { count: transactions.length })}
-          {hasPending && <span style={{ marginLeft: 6, color: '#f59e0b' }}>{t('history.autoRefreshing')}</span>}
+          {hasPending && <span style={{ marginLeft: 6, color: 'var(--ow-pending)' }}>{t('history.autoRefreshing')}</span>}
         </div>
       )}
     </div>

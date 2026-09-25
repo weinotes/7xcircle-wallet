@@ -127,16 +127,25 @@ export function Unlock() {
         error={error}
       />
 
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 'var(--ow-space-2)',
-        fontSize: 'var(--ow-font-size-xs)',
-        color: 'var(--ow-text-tertiary)',
-        cursor: 'pointer',
-      }} onClick={() => setShowPassword(s => !s)}>
-        {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-        {showPassword ? t('unlock.hidePassword') : t('unlock.showPassword')}
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <button
+          type="button"
+          onClick={() => setShowPassword(s => !s)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 'var(--ow-space-2)',
+            fontSize: 'var(--ow-font-size-xs)',
+            color: 'var(--ow-text-tertiary)',
+            cursor: 'pointer',
+            background: 'none',
+            border: 'none',
+            fontFamily: 'inherit',
+          }}
+        >
+          {showPassword ? <EyeOff size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}
+          {showPassword ? t('unlock.hidePassword') : t('unlock.showPassword')}
+        </button>
       </div>
 
       <Button

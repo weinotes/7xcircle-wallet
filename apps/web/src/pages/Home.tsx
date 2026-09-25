@@ -18,29 +18,34 @@
  *
  * Layout:
  *   ┌─────────────────────────────────────┐
- *   │  Header: chain selector | lock btn  │
+ *   │  Header: chain picker | lock btn    │
  *   ├─────────────────────────────────────┤
- *   │  Total balance (native + tokens)     │
+ *   │  Hero: portfolio USD (or native)    │
  *   │  Token list (native + ERC20/BEP20)  │
  *   ├─────────────────────────────────────┤
- *   │  [Send] [Receive] [History] [Lock]  │
+ *   │  Round icon actions (send/swap/…)   │
  *   ├─────────────────────────────────────┤
  *   │  Recent transactions (top 3)         │
  *   └─────────────────────────────────────┘
  *
  * NOTE: This page only renders when store.unlocked === true.
  * All chain queries use accounts derived during unlock().
+ *
+ * UI notes for this revision:
+ *   - Loading shows skeletons, never bare "..." or blank flashes
+ *   - Clickable rows are real buttons (ListRow), not div-with-onClick
+ *   - Colors all reference design tokens so the light theme survives
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Lock, Send, ArrowLeftRight, TrendingUp, ArrowDownToLine, History as HistoryIcon, Settings, ArrowUpRight, ArrowDownLeft, Coins, RefreshCw, Plug } from 'lucide-react';
-import { Button } from '@open-wallet/ui';
+import { Lock, Send, ArrowLeftRight, TrendingUp, ArrowDownToLine, History as HistoryIcon, Settings, ArrowUpRight, ArrowDownLeft, Coins, RefreshCw, Plug, Copy, Check, ChevronDown } from 'lucide-react';
+import { Button, IconButton, Card, ListRow, Skeleton, EmptyState } from '@open-wallet/ui';
 import { useWalletStore } from '../store/wallet.js';
 import { chainRegistry } from '@open-wallet/core';
-import { CHAIN_CONFIGS } from '@open-wallet/chains';
-import { formatBalance } from '@open-wallet/shared';
+import { CHAIN_CONFIGS, priceTokens, totalUsd } from '@open-wallet/chains';
+import { formatBalance, formatUsd } from '@open-wallet/shared';
 import type { TokenBalance } from '@open-wallet/shared';
 import { useTransactionHistory } from '../hooks/useTransactionHistory.js';
 
@@ -55,6 +60,9 @@ export function Home() {
   const [tokens, setTokens] = useState<TokenBalance[]>([]);
   const [tokensLoading, setTokensLoading] = useState(false);
   const [tokensError, setTokensError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [chainOpen, setChainOpen] = useState(false);
+  const chainRef = useRef<HTMLDivElement | null>(null);
 
   const activeChain = CHAIN_CONFIGS.find(c => c.chainId === activeChainId);
   const currentAccount = accounts.find(a => a.chainId === activeChainId);
@@ -73,10 +81,16 @@ export function Home() {
     setTokensLoading(true);
     setTokensError(null);
     try {
-      const list = await adapter.getAllTokenBalances(currentAccount.address);
-      // Sort: native first, then by balance desc (amount > 0)
+      // Prices are fetched in the same pass: the balance list is useless
+      // without them, and a second render pass would flash bare amounts.
+      const priced = await priceTokens(await adapter.getAllTokenBalances(currentAccount.address));
+      const list = [...priced];
+      // Sort: native first, then by USD value, then by raw balance
       list.sort((a, b) => {
         if (a.isNative !== b.isNative) return a.isNative ? -1 : 1;
+        const aUsd = a.balanceUsd ?? 0;
+        const bUsd = b.balanceUsd ?? 0;
+        if (aUsd !== bUsd) return bUsd - aUsd;
         const aBal = BigInt(a.balance || '0');
         const bBal = BigInt(b.balance || '0');
         return bBal > aBal ? 1 : bBal < aBal ? -1 : 0;
@@ -96,7 +110,7 @@ export function Home() {
           isNative: true,
           balance: nativeBal,
         }]);
-      } catch { /* ignore */ }
+      } catch { /* shown via tokensError below */ }
     } finally {
       setTokensLoading(false);
     }
@@ -106,6 +120,27 @@ export function Home() {
     void fetchTokens();
   }, [fetchTokens]);
 
+  // Close the chain dropdown on outside click
+  useEffect(() => {
+    if (!chainOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (chainRef.current && !chainRef.current.contains(e.target as Node)) {
+        setChainOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [chainOpen]);
+
+  const copyAddress = async () => {
+    if (!currentAccount) return;
+    try {
+      await navigator.clipboard.writeText(currentAccount.address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* clipboard unavailable — the address stays selectable */ }
+  };
+
   const goSendToken = (tokenAddress: string | null, tokenSymbol: string) => {
     // Build a URL with optional token prefill via search params in a future
     // version — for now just go to /send; user selects ERC20 there
@@ -113,253 +148,340 @@ export function Home() {
     void tokenAddress; void tokenSymbol; // silence unused
   };
 
-  const contentStyle: React.CSSProperties = {
-    maxWidth: 720,
-    margin: '0 auto',
-    padding: 'var(--ow-space-6)',
-    minHeight: '100vh',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 'var(--ow-space-6)',
-  };
-
-  const headerStyle: React.CSSProperties = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  };
-
-  const balanceCardStyle: React.CSSProperties = {
-    backgroundColor: 'var(--ow-bg-secondary)',
-    borderRadius: 'var(--ow-radius-xl)',
-    padding: 'var(--ow-space-8)',
-    border: '1px solid var(--ow-border)',
-    textAlign: 'center',
-  };
-
-  const actionRowStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(4, 1fr)',
-    gap: 'var(--ow-space-3)',
-  };
-
   const chainSelector = (
-    <select
-      value={activeChainId}
-      onChange={e => setActiveChain(e.target.value)}
-      style={{
-        backgroundColor: 'var(--ow-bg-tertiary)',
-        color: 'var(--ow-text-primary)',
-        border: '1px solid var(--ow-border)',
-        borderRadius: 'var(--ow-radius-md)',
-        padding: 'var(--ow-space-2) var(--ow-space-3)',
-        fontSize: 'var(--ow-font-size-sm)',
-        cursor: 'pointer',
-      }}
-    >
-      {CHAIN_CONFIGS.map(c => (
-        <option key={c.chainId} value={c.chainId}>
-          {c.name} {c.testnet && '(testnet)'}
-        </option>
-      ))}
-    </select>
-  );
-
-  return (
-    <div style={contentStyle}>
-      <div style={headerStyle}>
-        <div style={{ fontSize: 'var(--ow-font-size-lg)', fontWeight: 700 }}>
-          7xCircle Wallet
-        </div>
-        <div style={{ display: 'flex', gap: 'var(--ow-space-2)', alignItems: 'center' }}>
-          {chainSelector}
-          <Button variant="ghost" size="sm" onClick={fetchTokens} disabled={tokensLoading}>
-            <RefreshCw size={16} style={tokensLoading ? { animation: 'spin 1s linear infinite' } : undefined} />
-          </Button>
-          <Link to="/settings">
-            <Button variant="ghost" size="sm">
-              <Settings size={16} />
-            </Button>
-          </Link>
-        </div>
-      </div>
-
-      {/* ── Native balance hero ─────────────────────────────────────── */}
-      {(() => {
-        const native = tokens.find(t => t.isNative);
-        const bal = native ? formatBalance(native.balance, native.decimals, 4) : (tokensLoading ? '...' : '0');
-        return (
-          <div style={balanceCardStyle}>
-            <div style={{ color: 'var(--ow-text-secondary)', fontSize: 'var(--ow-font-size-sm)', marginBottom: 'var(--ow-space-2)' }}>
-              {t('home.balanceOf', { chain: activeChain?.name ?? 'Unknown', symbol: activeChain?.nativeSymbol ?? '' })}
-            </div>
-            <div style={{ fontSize: 'var(--ow-font-size-3xl)', fontWeight: 700, fontFamily: 'var(--ow-font-mono)' }}>
-              {bal}
-            </div>
-            {currentAccount && (
-              <div style={{
-                marginTop: 'var(--ow-space-4)',
-                fontFamily: 'var(--ow-font-mono)',
-                fontSize: 'var(--ow-font-size-xs)',
-                color: 'var(--ow-text-secondary)',
-                wordBreak: 'break-all',
-              }}>
-                {currentAccount.address}
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
-      {/* ── Asset list (native + ERC20s) ─────────────────────────────── */}
-      {tokens.length > 1 && (
-        <div style={{
-          backgroundColor: 'var(--ow-bg-secondary)',
-          borderRadius: 'var(--ow-radius-xl)',
+    <div ref={chainRef} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={chainOpen}
+        aria-label={t('home.chainSelector', { chain: activeChain?.name ?? '' })}
+        onClick={() => setChainOpen(o => !o)}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 'var(--ow-space-2)',
+          backgroundColor: 'var(--ow-bg-tertiary)',
+          color: 'var(--ow-text-primary)',
           border: '1px solid var(--ow-border)',
-          padding: 'var(--ow-space-4) var(--ow-space-5)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 6,
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            fontSize: 'var(--ow-font-size-sm)',
-            fontWeight: 600,
-            marginBottom: 'var(--ow-space-2)',
-          }}>
-            <Coins size={14} /> {t('home.assets', { count: tokens.length })}
-            {tokensError && <span style={{ color: 'var(--ow-error)', fontSize: 11, fontWeight: 400 }}>· {tokensError}</span>}
-          </div>
-
-          {tokens.filter(t => !t.isNative).map(t => {
-            const formatted = formatBalance(t.balance, t.decimals, 6);
+          borderRadius: 'var(--ow-radius-md)',
+          padding: 'var(--ow-space-2) var(--ow-space-3)',
+          fontSize: 'var(--ow-font-size-sm)',
+          fontWeight: 600,
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+        }}
+      >
+        {activeChain?.name ?? activeChainId}
+        {activeChain?.testnet && <span className="ow-faint" style={{ fontSize: 'var(--ow-font-size-xs)' }}>testnet</span>}
+        <ChevronDown
+          size={14}
+          aria-hidden="true"
+          style={{
+            color: 'var(--ow-text-tertiary)',
+            transition: 'transform var(--ow-duration-fast) var(--ow-ease)',
+            transform: chainOpen ? 'rotate(180deg)' : 'none',
+          }}
+        />
+      </button>
+      {chainOpen && (
+        <div
+          role="listbox"
+          aria-label={t('home.chainSelectorLabel')}
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            insetInlineEnd: 0,
+            zIndex: 'var(--ow-z-dropdown)' as unknown as number,
+            minWidth: 200,
+            maxHeight: 320,
+            overflow: 'auto',
+            backgroundColor: 'var(--ow-bg-secondary)',
+            border: '1px solid var(--ow-border)',
+            borderRadius: 'var(--ow-radius-md)',
+            boxShadow: 'var(--ow-shadow-lg)',
+          }}
+        >
+          {CHAIN_CONFIGS.map(c => {
+            const selected = c.chainId === activeChainId;
             return (
-              <div
-                key={t.address}
-                onClick={() => goSendToken(t.address, t.symbol)}
+              <button
+                key={c.chainId}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                onClick={() => {
+                  setActiveChain(c.chainId);
+                  setChainOpen(false);
+                }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
+                  gap: 'var(--ow-space-2)',
+                  width: '100%',
                   padding: '10px 12px',
-                  borderRadius: 'var(--ow-radius-md)',
-                  backgroundColor: 'var(--ow-bg-tertiary)',
-                  border: '1px solid var(--ow-border-subtle)',
+                  backgroundColor: selected ? 'var(--ow-bg-hover)' : 'transparent',
+                  border: 'none',
                   cursor: 'pointer',
-                  transition: 'background-color 150ms',
+                  color: 'var(--ow-text-primary)',
+                  fontFamily: 'inherit',
+                  fontSize: 'var(--ow-font-size-sm)',
+                  textAlign: 'start',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--ow-bg-secondary)')}
-                onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'var(--ow-bg-tertiary)')}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{
-                    width: 32, height: 32, borderRadius: '50%',
-                    backgroundColor: 'var(--ow-bg-secondary)',
-                    border: '1px solid var(--ow-border)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 11, fontWeight: 700, fontFamily: 'var(--ow-font-mono)',
-                    color: 'var(--ow-text-secondary)',
-                  }}>
-                    {t.symbol.slice(0, 3).toUpperCase()}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 'var(--ow-font-size-sm)', fontWeight: 600 }}>{t.symbol}</div>
-                    <div style={{ fontSize: 10, color: 'var(--ow-text-tertiary)', fontFamily: 'var(--ow-font-mono)' }}>
-                      {t.address.slice(0, 10)}…{t.address.slice(-6)}
-                    </div>
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontFamily: 'var(--ow-font-mono)', fontSize: 'var(--ow-font-size-sm)' }}>{formatted}</div>
-                  <div style={{ fontSize: 10, color: 'var(--ow-text-tertiary)' }}>{t.decimals} decimals</div>
-                </div>
-              </div>
+                <span>
+                  {c.name}
+                  {c.testnet && <span className="ow-faint" style={{ fontSize: 'var(--ow-font-size-xs)', marginInlineStart: 6 }}>(testnet)</span>}
+                </span>
+                {selected && <Check size={14} aria-hidden="true" style={{ color: 'var(--ow-accent)', flexShrink: 0 }} />}
+              </button>
             );
           })}
         </div>
       )}
+    </div>
+  );
 
-      {/* ── Quick actions ─────────────────────────────────────────────── */}
-      <div style={actionRowStyle}>
-        <Link to="/send" style={{ textDecoration: 'none' }}>
-          <Button variant="secondary" style={{ width: '100%', flexDirection: 'column', padding: 'var(--ow-space-4)', gap: 'var(--ow-space-1)' }}>
-            <Send size={20} /> {t('home.send')}
-          </Button>
-        </Link>
-        <Link to="/swap" style={{ textDecoration: 'none' }}>
-          <Button variant="secondary" style={{ width: '100%', flexDirection: 'column', padding: 'var(--ow-space-4)', gap: 'var(--ow-space-1)' }}>
-            <ArrowLeftRight size={20} /> {t('home.swap')}
-          </Button>
-        </Link>
-        <Link to="/earn" style={{ textDecoration: 'none' }}>
-          <Button variant="secondary" style={{ width: '100%', flexDirection: 'column', padding: 'var(--ow-space-4)', gap: 'var(--ow-space-1)' }}>
-            <TrendingUp size={20} /> {t('home.earn')}
-          </Button>
-        </Link>
-        <Link to="/receive" style={{ textDecoration: 'none' }}>
-          <Button variant="secondary" style={{ width: '100%', flexDirection: 'column', padding: 'var(--ow-space-4)', gap: 'var(--ow-space-1)' }}>
-            <ArrowDownToLine size={20} /> {t('home.receive')}
-          </Button>
-        </Link>
-        <Link to="/history" style={{ textDecoration: 'none' }}>
-          <Button variant="secondary" style={{ width: '100%', flexDirection: 'column', padding: 'var(--ow-space-4)', gap: 'var(--ow-space-1)' }}>
-            <HistoryIcon size={20} /> {t('home.history')}
-          </Button>
-        </Link>
-        {/* dApp approvals only exist inside the extension popup */}
-        {typeof chrome !== 'undefined' && Boolean((chrome as unknown as { runtime?: { id?: string } }).runtime?.id) && (
-          <Link to="/dapp" style={{ textDecoration: 'none' }}>
-            <Button variant="secondary" style={{ width: '100%', flexDirection: 'column', padding: 'var(--ow-space-4)', gap: 'var(--ow-space-1)' }}>
-              <Plug size={20} /> {t('home.dappRequests')}
-            </Button>
-          </Link>
-        )}
-        <Button
-          variant="secondary"
-          style={{ width: '100%', flexDirection: 'column', padding: 'var(--ow-space-4)', gap: 'var(--ow-space-1)' }}
-          onClick={lock}
-        >
-          <Lock size={20} /> {t('home.lock')}
-        </Button>
-      </div>
-
-      {/* ── Recent transactions ────────────────────────────────────────── */}
-      <div style={{
-        backgroundColor: 'var(--ow-bg-secondary)',
-        borderRadius: 'var(--ow-radius-xl)',
-        border: '1px solid var(--ow-border)',
-        padding: 'var(--ow-space-4) var(--ow-space-5)',
+  const actionTile = (to: string, icon: React.ReactNode, label: string) => (
+    <Link
+      to={to}
+      style={{
         display: 'flex',
         flexDirection: 'column',
+        alignItems: 'center',
         gap: 'var(--ow-space-2)',
-      }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
+        padding: 'var(--ow-space-3) var(--ow-space-2)',
+        color: 'var(--ow-text-primary)',
+        textDecoration: 'none',
+        borderRadius: 'var(--ow-radius-lg)',
+        border: '1px solid var(--ow-border-subtle)',
+        backgroundColor: 'var(--ow-bg-secondary)',
+        transition: 'background-color var(--ow-duration-fast) var(--ow-ease), border-color var(--ow-duration-fast) var(--ow-ease)',
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          display: 'inline-flex',
           alignItems: 'center',
-          marginBottom: 'var(--ow-space-2)',
-        }}>
-          <div style={{ fontSize: 'var(--ow-font-size-sm)', fontWeight: 600 }}>{t('home.recentTransactions')}</div>
-          <Link to="/history" style={{
-            fontSize: 'var(--ow-font-size-xs)',
-            color: 'var(--ow-info)',
-            textDecoration: 'none',
-          }}>{t('home.viewAll')}</Link>
+          justifyContent: 'center',
+          width: 40,
+          height: 40,
+          borderRadius: 'var(--ow-radius-full)',
+          backgroundColor: 'var(--ow-bg-hover)',
+          color: 'var(--ow-accent)',
+        }}
+      >
+        {icon}
+      </span>
+      <span style={{ fontSize: 'var(--ow-font-size-xs)', fontWeight: 600 }}>{label}</span>
+    </Link>
+  );
+
+  // ── Hero figures: USD portfolio first, bare native as the fallback ──
+  const native = tokens.find(tok => tok.isNative);
+  const priced = tokens.some(tok => tok.balanceUsd !== undefined);
+  const portfolioUsd = totalUsd(tokens);
+  const nativeBal = native ? formatBalance(native.balance, native.decimals, 4) : '0';
+
+  return (
+    <div className="ow-page">
+      <header className="ow-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--ow-space-3)' }}>
+          <span style={{ fontSize: 'var(--ow-font-size-lg)', fontWeight: 700 }}>
+            7xCircle Wallet
+          </span>
+          {chainSelector}
+        </div>
+        <div style={{ display: 'flex', gap: 'var(--ow-space-1)', alignItems: 'center' }}>
+          <IconButton aria-label={t('home.refresh')} onClick={() => void fetchTokens()} disabled={tokensLoading}>
+            <RefreshCw size={16} style={tokensLoading ? { animation: 'ow-spin 1s linear infinite' } : undefined} />
+          </IconButton>
+          <IconButton aria-label={t('home.settingsAria')} onClick={() => navigate('/settings')}>
+            <Settings size={16} />
+          </IconButton>
+          <IconButton aria-label={t('home.lock')} onClick={lock}>
+            <Lock size={16} />
+          </IconButton>
+        </div>
+      </header>
+
+      {/* ── Portfolio hero ──────────────────────────────────────────── */}
+      <Card centered style={{ padding: 'var(--ow-space-8)' }}>
+        {tokensLoading && tokens.length === 0 ? (
+          <>
+            <Skeleton width={180} height={14} />
+            <Skeleton width={220} height={36} style={{ marginTop: 'var(--ow-space-2)' }} />
+            <Skeleton width={140} height={12} style={{ marginTop: 'var(--ow-space-3)' }} />
+          </>
+        ) : (
+          <>
+            <div className="ow-muted" style={{ fontSize: 'var(--ow-font-size-sm)' }}>
+              {t('home.balanceOf', { chain: activeChain?.name ?? 'Unknown', symbol: activeChain?.nativeSymbol ?? '' })}
+            </div>
+            {priced ? (
+              <>
+                {/* USD portfolio total is what users actually scan for — make
+                    it the big number; the native balance becomes a sub-line. */}
+                <div className="ow-mono" style={{ fontSize: 'var(--ow-font-size-3xl)', fontWeight: 700 }}>
+                  {formatUsd(portfolioUsd)}
+                </div>
+                <div className="ow-mono ow-muted" style={{ fontSize: 'var(--ow-font-size-sm)', marginTop: 'var(--ow-space-1)' }}>
+                  {nativeBal} {activeChain?.nativeSymbol}
+                  {tokens.length > 1 && t('home.assets', { count: tokens.length })}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="ow-mono" style={{ fontSize: 'var(--ow-font-size-3xl)', fontWeight: 700 }}>
+                  {nativeBal} <span style={{ fontSize: 'var(--ow-font-size-xl)' }}>{activeChain?.nativeSymbol}</span>
+                </div>
+                {native?.balanceUsd !== undefined && (
+                  <div className="ow-mono ow-muted" style={{ fontSize: 'var(--ow-font-size-sm)', marginTop: 'var(--ow-space-1)' }}>
+                    ≈ {formatUsd(native.balanceUsd)}
+                  </div>
+                )}
+              </>
+            )}
+            {tokensError && (
+              <div role="status" style={{ color: 'var(--ow-warning)', fontSize: 'var(--ow-font-size-xs)', marginTop: 'var(--ow-space-2)' }}>
+                {t('home.loadDataIssue', { error: tokensError })}
+              </div>
+            )}
+            {currentAccount && (
+              <div style={{ marginTop: 'var(--ow-space-4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--ow-space-2)' }}>
+                <span className="ow-mono ow-muted" style={{ fontSize: 'var(--ow-font-size-xs)', wordBreak: 'break-all' }}>
+                  {currentAccount.address}
+                </span>
+                <IconButton
+                  aria-label={t('home.copyAddress')}
+                  size={14}
+                  onClick={() => void copyAddress()}
+                  style={{ padding: 'var(--ow-space-1)', flexShrink: 0 }}
+                >
+                  {copied ? <Check size={14} style={{ color: 'var(--ow-positive)' }} /> : <Copy size={14} />}
+                </IconButton>
+              </div>
+            )}
+          </>
+        )}
+      </Card>
+
+      {/* ── Asset list (native + ERC20s) ─────────────────────────────── */}
+      {tokensLoading && tokens.length > 1 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }} aria-hidden="true">
+          <Skeleton height={40} />
+          <Skeleton height={40} />
+        </div>
+      )}
+      {!tokensLoading && tokens.length > 1 && (
+        <Card>
+          <div className="ow-row-between" style={{ marginBottom: 'var(--ow-space-2)' }}>
+            <div className="ow-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Coins size={14} aria-hidden="true" /> {t('home.assets', { count: tokens.length })}
+            </div>
+            {tokensError && <span style={{ color: 'var(--ow-error)', fontSize: 'var(--ow-font-size-xs)' }}>{tokensError}</span>}
+          </div>
+
+          {tokens.filter(tok => !tok.isNative).map(tok => (
+            <ListRow
+              key={tok.address}
+              onClick={() => goSendToken(tok.address, tok.symbol)}
+              aria-label={t('home.sendTokenAria', { symbol: tok.symbol })}
+              start={
+                <>
+                  <div
+                    aria-hidden="true"
+                    className="ow-mono"
+                    style={{
+                      width: 32,
+                      height: 32,
+                      flexShrink: 0,
+                      borderRadius: 'var(--ow-radius-full)',
+                      backgroundColor: 'var(--ow-bg-secondary)',
+                      border: '1px solid var(--ow-border)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 'var(--ow-font-size-xs)',
+                      fontWeight: 700,
+                      color: 'var(--ow-text-secondary)',
+                    }}
+                  >
+                    {tok.symbol.slice(0, 3).toUpperCase()}
+                  </div>
+                  <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                    <span style={{ fontSize: 'var(--ow-font-size-sm)', fontWeight: 600 }}>{tok.symbol}</span>
+                    <span className="ow-mono ow-faint" style={{ fontSize: 'var(--ow-font-size-xs)' }}>
+                      {tok.address.slice(0, 10)}…{tok.address.slice(-6)}
+                    </span>
+                  </span>
+                </>
+              }
+              end={
+                <>
+                  <span className="ow-mono" style={{ fontSize: 'var(--ow-font-size-sm)' }}>
+                    {formatBalance(tok.balance, tok.decimals, 6)}
+                  </span>
+                  <span className="ow-faint" style={{ fontSize: 'var(--ow-font-size-xs)' }}>
+                    {tok.balanceUsd !== undefined
+                      ? `≈ ${formatUsd(tok.balanceUsd)}`
+                      : tok.priceUsd !== undefined
+                        ? `${formatUsd(tok.priceUsd)} / ${tok.symbol}`
+                        : `${tok.decimals} decimals`}
+                  </span>
+                </>
+              }
+            />
+          ))}
+        </Card>
+      )}
+
+      {/* ── Quick actions ─────────────────────────────────────────────── */}
+      {/* Lock left the grid for the header; the auto-fit grid wraps 5-6
+          tiles cleanly in web, popup, and every width between. */}
+      <nav className="ow-actions" aria-label={t('home.actionsLabel')}>
+        {actionTile('/send', <Send size={20} />, t('home.send'))}
+        {actionTile('/swap', <ArrowLeftRight size={20} />, t('home.swap'))}
+        {actionTile('/earn', <TrendingUp size={20} />, t('home.earn'))}
+        {actionTile('/receive', <ArrowDownToLine size={20} />, t('home.receive'))}
+        {actionTile('/history', <HistoryIcon size={20} />, t('home.history'))}
+        {/* dApp approvals only exist inside the extension popup */}
+        {typeof chrome !== 'undefined' && Boolean((chrome as unknown as { runtime?: { id?: string } }).runtime?.id) && (
+          actionTile('/dapp', <Plug size={20} />, t('home.dappRequests'))
+        )}
+      </nav>
+
+      {/* ── Recent transactions ────────────────────────────────────────── */}
+      <Card>
+        <div className="ow-row-between" style={{ marginBottom: 'var(--ow-space-2)' }}>
+          <div className="ow-label">{t('home.recentTransactions')}</div>
+          <Link to="/history" style={{ fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-info)', textDecoration: 'none' }}>
+            {t('home.viewAll')}
+          </Link>
         </div>
 
         {historyLoading && (
-          <div style={{ fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-text-tertiary)', padding: 'var(--ow-space-3) 0' }}>
-            {t('common.loading')}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--ow-space-3)' }} aria-label={t('common.loading')}>
+            <Skeleton height={36} />
+            <Skeleton height={36} />
+            <Skeleton height={36} />
           </div>
         )}
 
         {!historyLoading && recentTxs.length === 0 && (
-          <div style={{ fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-text-tertiary)', padding: 'var(--ow-space-3) 0' }}>
-            {t('home.noTransactions')}
-          </div>
+          <EmptyState
+            icon={<HistoryIcon size={28} />}
+            title={t('home.noTransactions')}
+            description={t('home.noTransactionsHint')}
+            action={
+              <Link to="/receive">
+                <Button variant="secondary" size="sm">
+                  <ArrowDownToLine size={14} /> {t('home.receive')}
+                </Button>
+              </Link>
+            }
+          />
         )}
 
         {!historyLoading && recentTxs.map(tx => {
@@ -371,60 +493,56 @@ export function Home() {
           const amt = formatBalance(tx.value, decimals, 4);
 
           return (
-            <div key={tx.hash} style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: 'var(--ow-space-2) 0',
-              borderBottom: '1px solid var(--ow-border-subtle)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--ow-space-3)' }}>
-                <div style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: '50%',
-                  backgroundColor: tx.status === 'pending'
-                    ? 'rgba(245, 158, 11, 0.15)'
-                    : 'var(--ow-bg-tertiary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
+            <div
+              key={tx.hash}
+              className="ow-row-between"
+              style={{ padding: 'var(--ow-space-2) 0', borderTop: '1px solid var(--ow-border-subtle)' }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--ow-space-3)', minWidth: 0 }}>
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 28,
+                    height: 28,
+                    flexShrink: 0,
+                    borderRadius: 'var(--ow-radius-full)',
+                    backgroundColor: tx.status === 'pending' ? 'var(--ow-pending-bg)' : 'var(--ow-bg-tertiary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
                   {isSent
-                    ? <ArrowUpRight size={14} color="#f87171" />
-                    : <ArrowDownLeft size={14} color="#22c55e" />}
-                </div>
-                <div>
-                  <div style={{ fontSize: 'var(--ow-font-size-xs)', fontWeight: 600 }}>
+                    ? <ArrowUpRight size={14} style={{ color: 'var(--ow-negative-fg)' }} />
+                    : <ArrowDownLeft size={14} style={{ color: 'var(--ow-positive-fg)' }} />}
+                </span>
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                  <span style={{ fontSize: 'var(--ow-font-size-xs)', fontWeight: 600 }}>
                     {isSent
-                    ? (tx.tokenSymbol ? t('home.sentToken', { symbol: tx.tokenSymbol }) : t('home.sent'))
-                    : (tx.tokenSymbol ? t('home.receivedToken', { symbol: tx.tokenSymbol }) : t('home.received'))}
+                      ? (tx.tokenSymbol ? t('home.sentToken', { symbol: tx.tokenSymbol }) : t('home.sent'))
+                      : (tx.tokenSymbol ? t('home.receivedToken', { symbol: tx.tokenSymbol }) : t('home.received'))}
                     {tx.status === 'pending' && (
-                      <span style={{ marginLeft: 6, fontSize: 10, color: '#f59e0b' }}>· {t('home.pending')}</span>
+                      <span style={{ marginInlineStart: 6, fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-pending-fg)' }}>· {t('home.pending')}</span>
                     )}
-                  </div>
-                  <div style={{ fontSize: '10px', color: 'var(--ow-text-tertiary)', fontFamily: 'var(--ow-font-mono)' }}>
+                  </span>
+                  <span className="ow-mono ow-faint" style={{ fontSize: 'var(--ow-font-size-xs)' }}>
                     {(tx.to || tx.hash).slice(0, 10)}…
-                  </div>
-                </div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{
-                  fontFamily: 'var(--ow-font-mono)',
-                  fontSize: 'var(--ow-font-size-sm)',
-                  color: isPositive ? '#22c55e' : '#f87171',
-                }}>
+                  </span>
+                </span>
+              </span>
+              <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                <span className="ow-mono" style={{ fontSize: 'var(--ow-font-size-sm)', color: isPositive ? 'var(--ow-positive-fg)' : 'var(--ow-negative-fg)' }}>
                   {isPositive ? '+' : '-'}{amt}
-                </div>
-                <div style={{ fontSize: '10px', color: 'var(--ow-text-tertiary)' }}>{symbol}</div>
-              </div>
+                </span>
+                <span className="ow-faint" style={{ fontSize: 'var(--ow-font-size-xs)' }}>{symbol}</span>
+              </span>
             </div>
           );
         })}
-      </div>
+      </Card>
 
-      <div style={{ marginTop: 'auto', textAlign: 'center', fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-text-tertiary)' }}>
-        7xCircle Wallet · Apache-2.0 · v0.1.0
+      <div className="ow-page--footer ow-faint" style={{ marginTop: 'auto', textAlign: 'center', fontSize: 'var(--ow-font-size-xs)' }}>
+        {t('home.footer')}
       </div>
     </div>
   );

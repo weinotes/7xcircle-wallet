@@ -21,8 +21,23 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   hint?: string;
 }
 
+const SHEET_ID = 'ow-ui-input-styles';
+const INPUT_CSS = `
+input.ow-input:focus-visible { outline: none; border-color: var(--ow-accent) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ow-accent) 25%, transparent); }
+`;
+function ensureInputStyles(): void {
+  if (typeof document === 'undefined' || document.getElementById(SHEET_ID)) return;
+  const tag = document.createElement('style');
+  tag.id = SHEET_ID;
+  tag.textContent = INPUT_CSS;
+  document.head.appendChild(tag);
+}
+
 export function Input({ label, error, hint, style, id, ...rest }: InputProps) {
+  ensureInputStyles();
   const inputId = id || rest.name;
+  const errorId = inputId ? `${inputId}-error` : undefined;
+  const hintId = inputId ? `${inputId}-hint` : undefined;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--ow-space-1)' }}>
       {label && (
@@ -39,6 +54,9 @@ export function Input({ label, error, hint, style, id, ...rest }: InputProps) {
       )}
       <input
         id={inputId}
+        className="ow-input"
+        aria-invalid={error ? true : undefined}
+        aria-describedby={[error ? errorId : null, !error && hint ? hintId : null].filter(Boolean).join(' ') || undefined}
         style={{
           backgroundColor: 'var(--ow-bg-secondary)',
           color: 'var(--ow-text-primary)',
@@ -54,12 +72,12 @@ export function Input({ label, error, hint, style, id, ...rest }: InputProps) {
         {...rest}
       />
       {error && (
-        <span style={{ fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-error)' }}>
+        <span id={errorId} role="alert" style={{ fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-error)' }}>
           {error}
         </span>
       )}
       {!error && hint && (
-        <span style={{ fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-text-tertiary)' }}>
+        <span id={hintId} style={{ fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-text-tertiary)' }}>
           {hint}
         </span>
       )}

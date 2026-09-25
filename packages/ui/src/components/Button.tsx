@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 import * as React from 'react';
+import { Spinner } from './Spinner.js';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type ButtonSize = 'sm' | 'md' | 'lg';
@@ -57,13 +58,30 @@ const baseStyles: React.CSSProperties = {
   borderRadius: 'var(--ow-radius-md)',
   fontWeight: 600,
   cursor: 'pointer',
-  transition: 'all 0.15s ease',
+  transition: 'background-color var(--ow-duration-fast) var(--ow-ease), border-color var(--ow-duration-fast) var(--ow-ease), transform var(--ow-duration-fast) var(--ow-ease)',
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   gap: 'var(--ow-space-2)',
   fontFamily: 'var(--ow-font-sans)',
 };
+
+/**
+ * Press feedback cannot live in inline styles; injected once alongside the
+ * component so every Button (and IconButton) gets it.
+ */
+const SHEET_ID = 'ow-ui-button-styles';
+const BUTTON_CSS = `
+button.ow-button-base:focus-visible { outline: 2px solid var(--ow-accent); outline-offset: 2px; }
+button.ow-button-base:active:not(:disabled) { transform: translateY(1px); filter: brightness(0.92); }
+`;
+function ensureButtonStyles(): void {
+  if (typeof document === 'undefined' || document.getElementById(SHEET_ID)) return;
+  const tag = document.createElement('style');
+  tag.id = SHEET_ID;
+  tag.textContent = BUTTON_CSS;
+  document.head.appendChild(tag);
+}
 
 export function Button({
   variant = 'primary',
@@ -74,9 +92,12 @@ export function Button({
   style,
   ...rest
 }: ButtonProps) {
+  ensureButtonStyles();
   return (
     <button
       disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      className="ow-button-base"
       style={{
         ...baseStyles,
         ...variantStyles[variant],
@@ -86,7 +107,7 @@ export function Button({
       }}
       {...rest}
     >
-      {loading && <span>Loading...</span>}
+      {loading && <Spinner size={size === 'lg' ? 18 : 14} />}
       {!loading && children}
     </button>
   );

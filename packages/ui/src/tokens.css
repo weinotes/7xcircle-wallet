@@ -5,6 +5,8 @@
  * Token naming convention: --ow-<category>-<name>
  */
 
+@import './animations.css';
+
 :root {
   /* Spacing scale */
   --ow-space-1: 0.25rem;
@@ -35,36 +37,72 @@
   --ow-font-size-2xl: 1.5rem;
   --ow-font-size-3xl: 2rem;
 
+  /* Font weights — one scale so pages stop inventing their own */
+  --ow-font-weight-normal: 400;
+  --ow-font-weight-medium: 500;
+  --ow-font-weight-semibold: 600;
+  --ow-font-weight-bold: 700;
+  --ow-font-weight-extrabold: 800;
+
+  /* Motion */
+  --ow-duration-fast: 150ms;
+  --ow-duration-base: 250ms;
+  --ow-ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Layering — single source of truth for stacking */
+  --ow-z-dropdown: 100;
+  --ow-z-sticky: 500;
+  --ow-z-modal: 1000;
+  --ow-z-toast: 1100;
+
   /* Shadows */
   --ow-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
   --ow-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   --ow-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 }
 
-/* Dark theme (default) */
+/* Dark theme (default) — Ledger-Live-style near-black canvas, MetaMask blue */
 :root,
 [data-theme='dark'] {
-  --ow-bg-primary: #0d1117;
-  --ow-bg-secondary: #161b22;
-  --ow-bg-tertiary: #21262d;
-  --ow-bg-hover: #30363d;
+  --ow-bg-primary: #0b0c0f;
+  --ow-bg-secondary: #16181d;
+  --ow-bg-tertiary: #1f2228;
+  --ow-bg-hover: #2b2f38;
 
-  --ow-text-primary: #e6edf3;
-  --ow-text-secondary: #8b949e;
-  --ow-text-tertiary: #6e7681;
-  --ow-text-inverse: #0d1117;
+  --ow-text-primary: #ffffff;
+  --ow-text-secondary: #a4aab3;
+  /* Bumped so small secondary text — addresses, timestamps — meets WCAG AA
+     on the card surfaces. */
+  --ow-text-tertiary: #8b929c;
+  --ow-text-inverse: #0b0c0f;
 
-  --ow-border: #30363d;
-  --ow-border-subtle: #21262d;
+  --ow-border: #2b2f38;
+  --ow-border-subtle: #1f2228;
 
-  --ow-accent: #2f81f7;
-  --ow-accent-hover: #1f6feb;
+  --ow-accent: #037dd6;
+  --ow-accent-hover: #4c8edf;
   --ow-accent-fg: #ffffff;
 
-  --ow-success: #3fb950;
-  --ow-warning: #d29922;
-  --ow-error: #f85149;
-  --ow-info: #58a6ff;
+  --ow-success: #31c48d;
+  --ow-warning: #f5a623;
+  --ow-error: #ff6b76;
+  --ow-info: #4c8edf;
+
+  /* Badge/alert wash backgrounds — pages compose status chips with these
+     instead of hand-rolling rgba(…, 0.12) tints. */
+  --ow-success-bg: rgba(49, 196, 141, 0.13);
+  --ow-warning-bg: rgba(245, 166, 35, 0.13);
+  --ow-error-bg: rgba(255, 107, 118, 0.13);
+
+  /* P&L semantics — positive/negative must survive a theme switch, so
+     pages reference these instead of hardcoding #22c55e / #f87171. */
+  --ow-positive: #31c48d;
+  --ow-positive-fg: #3fd99b;
+  --ow-negative: #ff6b76;
+  --ow-negative-fg: #ff8a92;
+  --ow-pending: #f5a623;
+  --ow-pending-fg: #f5a623;
+  --ow-pending-bg: rgba(245, 166, 35, 0.14);
 }
 
 /* Light theme */
@@ -82,12 +120,27 @@
   --ow-border: #d0d7de;
   --ow-border-subtle: #eaeef2;
 
-  --ow-accent: #0969da;
-  --ow-accent-hover: #0550ae;
+  --ow-accent: #037dd6;
+  --ow-accent-hover: #0260a5;
   --ow-accent-fg: #ffffff;
 
-  --ow-success: #1a7f37;
-  --ow-warning: #9a6700;
-  --ow-error: #cf222e;
+  --ow-success: #1a9e6a;
+  --ow-warning: #b07508;
+  --ow-error: #d1242f;
   --ow-info: #0969da;
+
+  /* Badge/alert wash backgrounds */
+  --ow-success-bg: rgba(26, 158, 106, 0.12);
+  --ow-warning-bg: rgba(176, 117, 8, 0.12);
+  --ow-error-bg: rgba(209, 36, 47, 0.1);
+
+  /* Light-theme P&L semantics — the dark neon greens/reds fail contrast
+     on white, so the palette shifts to the accessible variants. */
+  --ow-positive: #1a9e6a;
+  --ow-positive-fg: #148055;
+  --ow-negative: #d1242f;
+  --ow-negative-fg: #c2222c;
+  --ow-pending: #b07508;
+  --ow-pending-fg: #b07508;
+  --ow-pending-bg: rgba(176, 117, 8, 0.12);
 }

@@ -29,6 +29,7 @@ import { Settings } from './pages/Settings.js';
 import { DappApprovals } from './pages/DappApprovals.js';
 import { LedgerConnect } from './pages/LedgerConnect.js';
 import { useWalletStore } from './store/wallet.js';
+import { useThemeSync } from './hooks/useThemeSync.js';
 import { registerAllChains } from '@open-wallet/chains';
 import { touchActivity } from '@open-wallet/core';
 
@@ -44,6 +45,9 @@ function App() {
   const unlocked = useWalletStore(s => s.unlocked);
   const lock = useWalletStore(s => s.lock);
   const language = useWalletStore(s => s.language);
+
+  // Reflect the persisted theme onto <html data-theme> so tokens repaint
+  useThemeSync();
 
   // ── Keep i18next + document direction in sync with the store ──
   useEffect(() => {

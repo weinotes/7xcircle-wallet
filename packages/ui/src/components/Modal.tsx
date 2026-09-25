@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 
 export interface ModalProps {
   open: boolean;
@@ -30,7 +31,7 @@ const overlayStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  zIndex: 1000,
+  zIndex: 'var(--ow-z-modal)' as unknown as number,
   padding: 'var(--ow-space-4)',
 };
 
@@ -64,16 +65,72 @@ const footerStyle: React.CSSProperties = {
   justifyContent: 'flex-end',
 };
 
-export function Modal({ open, onClose, title, children, footer }: ModalProps) {
-  if (!open) return null;
+const FOCUSABLE =
+  'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
 
-  return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div style={contentStyle} onClick={e => e.stopPropagation()}>
-        {title && <div style={headerStyle}>{title}</div>}
+/**
+ * Dialog rendered in a portal with real dialog semantics: Escape closes,
+ * Tab is trapped inside the panel, and focus returns to the trigger on
+ * unmount — the pattern the previous plain-div version was missing.
+ */
+export function Modal({ open, onClose, title, children, footer }: ModalProps) {
+  const panelRef = React.useRef<HTMLDivElement | null>(null);
+  const titleId = React.useId();
+
+  React.useEffect(() => {
+    if (!open) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+
+    // Move focus into the dialog — first interactive element, else the panel.
+    const panel = panelRef.current;
+    const initial = panel?.querySelector<HTMLElement>(FOCUSABLE);
+    (initial ?? panel)?.focus();
+
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab' || !panel) return;
+      const focusables = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE));
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKey, true);
+    return () => {
+      document.removeEventListener('keydown', handleKey, true);
+      previouslyFocused?.focus();
+    };
+  }, [open, onClose]);
+
+  if (!open || typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div style={overlayStyle} onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
+        tabIndex={-1}
+        style={contentStyle}
+        onClick={e => e.stopPropagation()}
+      >
+        {title && <div id={titleId} style={headerStyle}>{title}</div>}
         <div style={bodyStyle}>{children}</div>
         {footer && <div style={footerStyle}>{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -1,0 +1,29 @@
+/**
+ * Shared keyframes for @open-wallet/ui components (Spinner uses `ow-spin`,
+ * Skeleton uses `ow-shimmer`). Imported by tokens.css so any app that loads
+ * the design system also gets the animations it references.
+ */
+
+@keyframes ow-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes ow-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Animations become instant states rather than being removed outright —
+     a spinner that never moves would read as a freeze. */
+  .ow-skeleton {
+    animation: none !important;
+    background-position: 0 0 !important;
+  }
+}
