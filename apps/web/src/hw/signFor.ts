@@ -23,9 +23,9 @@
  * hardware account can never accidentally hit the software key path.
  */
 
-import { getPrivateKey } from '@open-wallet/core';
-import type { Account, SignedTransaction, UnsignedTx } from '@open-wallet/shared';
-import type { ChainAdapter } from '@open-wallet/core';
+import { getPrivateKey } from '@7xcircle/core';
+import type { Account, SignedTransaction, UnsignedTx } from '@7xcircle/shared';
+import type { ChainAdapter } from '@7xcircle/core';
 
 import { ledgerPathOf, ledgerSignEvmTransaction, openEthApp } from './ledger.js';
 

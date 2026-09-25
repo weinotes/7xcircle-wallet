@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * English translations — OpenWallet UI.
+ * English translations — 7xCircle Wallet UI.
  */
 export default {
   // ── Common ──

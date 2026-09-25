@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * الترجمات العربية — واجهة OpenWallet.
+ * الترجمات العربية — واجهة 7xCircle Wallet.
  * العربية لغة RTL (من اليمين إلى اليسار) — تعامل عبر i18n syncDocumentDirection.
  */
 export default {

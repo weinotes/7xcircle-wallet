@@ -29,7 +29,7 @@
 
 import { secp256k1 } from '@noble/curves/secp256k1';
 import { ed25519 } from '@noble/curves/ed25519';
-import { fromHex } from '@open-wallet/shared';
+import { fromHex } from '@7xcircle/shared';
 
 import type { VaultKeyEntry } from '../vault/secret.js';
 

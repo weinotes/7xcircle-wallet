@@ -39,7 +39,7 @@
 ## Repository Structure
 
 ```
-open-wallet/
+7xcircle-wallet/
 ├── apps/
 │   ├── web/          # Web app (React + Vite)
 │   ├── extension/    # Chrome/Chromium MV3 extension
@@ -59,15 +59,15 @@ pnpm install
 pnpm dev          # start web app (Vite dev server)
 pnpm build        # build all packages + web
 pnpm typecheck    # type-check all workspaces
-pnpm --filter @open-wallet/mobile start  # start Android development
-pnpm --filter @open-wallet/mobile android # build/run on Android device or emulator
+pnpm --filter @7xcircle/mobile start  # start Android development
+pnpm --filter @7xcircle/mobile android # build/run on Android device or emulator
 ```
 
 ### Android
 
 The Android app is an Expo/React Native client using the same wallet core and chain adapters.
 The encrypted vault is stored with Android SecureStore. Run `pnpm install`, then use
-`pnpm --filter @open-wallet/mobile android` with Android Studio/SDK installed.
+`pnpm --filter @7xcircle/mobile android` with Android Studio/SDK installed.
 The mobile app now covers all production chains with a switcher — TRON (TRX +
 USDT-TRC20), BNB Chain, Solana and Ethereum first — showing adapter-discovered
 token balances and sending native or token transfers through the same
@@ -84,7 +84,7 @@ check against GitHub Releases.
 
 ### Browser extension
 
-Build with `pnpm --filter @open-wallet/extension build`, then load
+Build with `pnpm --filter @7xcircle/extension build`, then load
 `apps/extension/dist` as an unpacked extension in Chrome or another Chromium browser.
 The popup supports the wallet UI, and the injected EIP-1193 provider exposes the
 current BNB chain and read-only account discovery while transaction approval UI is

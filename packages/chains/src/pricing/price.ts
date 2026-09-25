@@ -30,8 +30,8 @@
  * All parsing is pure and unit-tested; only the two fetchers are impure.
  */
 
-import { formatBalance } from '@open-wallet/shared';
-import type { ChainType, TokenBalance } from '@open-wallet/shared';
+import { formatBalance } from '@7xcircle/shared';
+import type { ChainType, TokenBalance } from '@7xcircle/shared';
 
 /** SOL's wrapped form — Jupiter prices native SOL through this mint. */
 const WRAPPED_SOL_MINT = 'So11111111111111111111111111111111111111112';

@@ -35,7 +35,7 @@ import { deriveEvmPrivateKey, evmPublicKey } from '../packages/core/src/keys/mne
 import { TronAdapter } from '../packages/chains/src/tron/adapter.js';
 import { publicKeyToTronAddress } from '../packages/chains/src/tron/address.js';
 import { getChainConfig } from '../packages/chains/src/configs.js';
-import type { TxIntent } from '@open-wallet/shared';
+import type { TxIntent } from '@7xcircle/shared';
 
 const USDT_TRC20 = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
 

@@ -27,8 +27,8 @@ import { useCallback, useEffect, useRef, useState, type ComponentType } from 're
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import type { SignClientTypes, SessionTypes } from '@walletconnect/types';
-import { chainRegistry, getPrivateKey, signPersonalMessage } from '@open-wallet/core';
-import type { Account } from '@open-wallet/shared';
+import { chainRegistry, getPrivateKey, signPersonalMessage } from '@7xcircle/core';
+import type { Account } from '@7xcircle/shared';
 import { Button, shorten } from '../components';
 import { evmChainFromCaip } from '../chains';
 import { sendTx } from '../tx';

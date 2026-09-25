@@ -1,5 +1,5 @@
 {
-  "name": "@open-wallet/ui",
+  "name": "@7xcircle/ui",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -20,7 +20,7 @@
     "external": ["react", "react-dom"]
   },
   "dependencies": {
-    "@open-wallet/shared": "workspace:*",
+    "@7xcircle/shared": "workspace:*",
     "lucide-react": "^0.460.0"
   },
   "peerDependencies": {

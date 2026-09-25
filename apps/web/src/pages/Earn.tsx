@@ -32,8 +32,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ExternalLink } from 'lucide-react';
-import { Button, Input } from '@open-wallet/ui';
-import { chainRegistry } from '@open-wallet/core';
+import { Button, Input } from '@7xcircle/ui';
+import { chainRegistry } from '@7xcircle/core';
 import {
   SOLANA_STAKE_PRODUCTS,
   SOL_MINT,
@@ -45,8 +45,8 @@ import {
   type EarnVault,
   type StakeProduct,
   type StakeApy,
-} from '@open-wallet/chains';
-import { formatBalance, parseAmount } from '@open-wallet/shared';
+} from '@7xcircle/chains';
+import { formatBalance, parseAmount } from '@7xcircle/shared';
 import { useWalletStore } from '../store/wallet.js';
 import { useTxFlow } from '../hooks/useTxFlow.js';
 import { SWAP_CHAIN_ID } from '../config.js';

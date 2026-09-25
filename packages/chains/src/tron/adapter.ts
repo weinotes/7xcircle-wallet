@@ -43,7 +43,7 @@ import {
   fromHex,
   parseAmount as parseAmountHelper,
   toHex,
-} from '@open-wallet/shared';
+} from '@7xcircle/shared';
 import type {
   ChainConfig,
   ExternalTx,
@@ -54,8 +54,8 @@ import type {
   TransactionRecord,
   TxIntent,
   UnsignedTx,
-} from '@open-wallet/shared';
-import type { BuildOpts, ChainAdapter } from '@open-wallet/core';
+} from '@7xcircle/shared';
+import type { BuildOpts, ChainAdapter } from '@7xcircle/core';
 
 import {
   isValidTronAddress,

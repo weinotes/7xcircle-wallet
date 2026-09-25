@@ -26,8 +26,8 @@
  * rebuild. Pass `allowRebuild: false` for those.
  */
 
-import { getPrivateKey, touchActivity } from '@open-wallet/core';
-import type { ChainAdapter } from '@open-wallet/core';
+import { getPrivateKey, touchActivity } from '@7xcircle/core';
+import type { ChainAdapter } from '@7xcircle/core';
 import type {
   Account,
   ExternalTx,
@@ -35,7 +35,7 @@ import type {
   TransactionRecord,
   TxIntent,
   UnsignedTx,
-} from '@open-wallet/shared';
+} from '@7xcircle/shared';
 
 /** How long to wait for a confirmation before treating it as stalled */
 const CONFIRM_TIMEOUT_MS = 90_000;

@@ -29,7 +29,7 @@ import {
   getAssociatedTokenAddress,
 } from '@solana/spl-token';
 
-import type { FeeTier, TxIntent } from '@open-wallet/shared';
+import type { FeeTier, TxIntent } from '@7xcircle/shared';
 
 /**
  * Compute unit ceiling per intent kind.

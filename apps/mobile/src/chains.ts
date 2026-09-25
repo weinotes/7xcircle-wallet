@@ -21,8 +21,8 @@
  * TRON Nile balances next to real funds and tempt exactly the wrong tap.
  */
 
-import { CHAIN_CONFIGS } from '@open-wallet/chains';
-import type { ChainConfig } from '@open-wallet/shared';
+import { CHAIN_CONFIGS } from '@7xcircle/chains';
+import type { ChainConfig } from '@7xcircle/shared';
 
 /** Mainnet chains shown in the mobile asset switcher */
 export const PRODUCTION_CHAINS: ChainConfig[] = CHAIN_CONFIGS.filter(c => !c.testnet);

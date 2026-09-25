@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 // MUST stay the first import: patches globalThis.Buffer before any module
-// that touches Buffer at top level (spl-token via @open-wallet/chains).
+// that touches Buffer at top level (spl-token via @7xcircle/chains).
 import './polyfills.js';
 import './setup.js';
 import React from 'react';
@@ -22,7 +22,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.js';
 import './styles/globals.css';
-import '@open-wallet/ui/src/tokens.css';
+import '@7xcircle/ui/src/tokens.css';
 import './i18n/index.js';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

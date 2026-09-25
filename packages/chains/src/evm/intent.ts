@@ -19,7 +19,7 @@
 
 import { encodeFunctionData, erc20Abi, type Address, type Hex } from 'viem';
 
-import type { TxIntent } from '@open-wallet/shared';
+import type { TxIntent } from '@7xcircle/shared';
 
 /** A compiled EVM call — the fields that go on the wire */
 export interface EvmCall {

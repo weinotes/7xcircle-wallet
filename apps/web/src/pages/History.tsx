@@ -29,13 +29,13 @@ import { useEffect, useState, type JSX } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ArrowUpRight, ArrowDownRight, Clock, CheckCircle2, XCircle, RefreshCw, ExternalLink, Inbox } from 'lucide-react';
-import { Button, IconButton, Card, Skeleton, EmptyState } from '@open-wallet/ui';
+import { Button, IconButton, Card, Skeleton, EmptyState } from '@7xcircle/ui';
 import { useWalletStore } from '../store/wallet.js';
-import { CHAIN_CONFIGS } from '@open-wallet/chains';
+import { CHAIN_CONFIGS } from '@7xcircle/chains';
 import { useTransactionHistory } from '../hooks/useTransactionHistory.js';
-import { chainRegistry } from '@open-wallet/core';
-import { formatBalance } from '@open-wallet/shared';
-import type { TransactionRecord } from '@open-wallet/shared';
+import { chainRegistry } from '@7xcircle/core';
+import { formatBalance } from '@7xcircle/shared';
+import type { TransactionRecord } from '@7xcircle/shared';
 
 function truncateHash(hash: string): string {
   return `${hash.slice(0, 10)}…${hash.slice(-8)}`;

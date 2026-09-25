@@ -19,7 +19,7 @@
  * Every third-party integration reads its credentials from here and pushes
  * them into the owning module through a setter — the browser build has no
  * `process.env`, so a module-level setter is the only way a key reaches
- * `@open-wallet/chains` (see `setJupiterBaseUrl` for the reference pattern).
+ * `@7xcircle/chains` (see `setJupiterBaseUrl` for the reference pattern).
  *
  * Every key is OPTIONAL. An unset key disables exactly one feature and
  * nothing else: the swap page falls back to Solana-only, the Earn page shows
@@ -40,7 +40,7 @@ import {
   setTronsaveSponsor,
   setZeroExApiKey,
   setZeroExBaseUrl,
-} from '@open-wallet/chains';
+} from '@7xcircle/chains';
 
 interface EnvLike {
   // ── Swap (Solana / Jupiter) ──

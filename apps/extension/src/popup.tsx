@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * OpenWallet browser extension — popup entry.
+ * 7xCircle Wallet browser extension — popup entry.
  *
  * The popup reuses the web app's pages, store, i18n, and styles via the
  * `@web` alias. Unlike the web SPA (BrowserRouter), the extension popup
@@ -22,14 +22,14 @@
  */
 
 // MUST stay the first import: patches globalThis.Buffer before any module
-// touches Buffer at top level (spl-token via @open-wallet/chains).
+// touches Buffer at top level (spl-token via @7xcircle/chains).
 import '@web/polyfills.js';
 import '@web/setup.js';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import '@web/styles/globals.css';
-import '@open-wallet/ui/src/tokens.css';
+import '@7xcircle/ui/src/tokens.css';
 import '@web/i18n/index.js';
 
 import AppShell from './AppShell.js';

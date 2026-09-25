@@ -48,7 +48,7 @@
  * the web app with no proxy.
  */
 
-import type { TxIntent } from '@open-wallet/shared';
+import type { TxIntent } from '@7xcircle/shared';
 
 // ─── Endpoint config ────────────────────────────────────────────────
 

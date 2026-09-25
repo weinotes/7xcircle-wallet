@@ -1,4 +1,4 @@
-# OpenWallet 技术方案
+# 7xCircle Wallet 技术方案
 
 > 开源、多链、本地托管的加密货币钱包 — 支持 Web / 移动端 / 桌面端全平台
 
@@ -8,7 +8,7 @@
 
 | 项目 | 说明 |
 |------|------|
-| **名称** | OpenWallet（暂定） |
+| **名称** | 7xCircle Wallet |
 | **许可证** | Apache-2.0 |
 | **核心原则** | 私钥永不出设备、无后端依赖、完全开源可审计 |
 | **目标用户** | 个人使用 + 开源社区贡献者 |
@@ -36,7 +36,7 @@
 ### 2.1 整体架构：Monorepo + Turborepo
 
 ```
-open-wallet/
+7xcircle-wallet/
 ├── apps/
 │   ├── web/          # Web 版 (React + Vite + PWA)
 │   ├── mobile/       # 移动端 (React Native + Expo)
@@ -500,7 +500,7 @@ Phase 3 ─── DeFi
 
 ```bash
 # 创建项目
-mkdir open-wallet && cd open-wallet
+mkdir 7xcircle-wallet && cd 7xcircle-wallet
 pnpm init
 
 # Monorepo 基础

@@ -38,10 +38,10 @@ export const SALT_SIZE = 16;
 /** Default derivation account index */
 export const DEFAULT_ACCOUNT_INDEX = 0;
 
-/** App display name */
-export const APP_NAME = 'OpenWallet';
+/** App name — also the storage namespace (`${APP_NAME}-store` persists the vault). */
+export const APP_NAME = '7xcircle-wallet';
 
-/** Public product brand. APP_NAME remains stable for storage compatibility. */
+/** Public product brand as shown in the UI. */
 export const BRAND_NAME = '7xCircle Wallet';
 
 /** Supported UI languages */

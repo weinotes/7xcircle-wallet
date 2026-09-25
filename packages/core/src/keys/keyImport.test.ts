@@ -29,7 +29,7 @@ import {
   base58Encode,
   parsePrivateKey,
 } from './keyImport.js';
-import { toHex } from '@open-wallet/shared';
+import { toHex } from '@7xcircle/shared';
 
 const PK1_HEX = '0x' + '00'.repeat(31) + '01';
 // secp256k1 pubkey of scalar 1, uncompressed sans 0x04 — well-known vector

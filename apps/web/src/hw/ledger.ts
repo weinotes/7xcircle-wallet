@@ -32,7 +32,7 @@
 import TransportWebUSB from '@ledgerhq/hw-transport-webusb';
 import { serializeTransaction, type Signature } from 'viem';
 
-import type { Account, SignedTransaction, UnsignedTx } from '@open-wallet/shared';
+import type { Account, SignedTransaction, UnsignedTx } from '@7xcircle/shared';
 
 /** Instance type of the Ledger Ethereum app, resolved at import time */
 type EthApp = InstanceType<typeof import('@ledgerhq/hw-app-eth')['default']>;

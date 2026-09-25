@@ -39,8 +39,8 @@ import {
 import { decodeVaultSecret, type VaultKeyEntry } from '../vault/secret.js';
 import { parsePrivateKey } from '../keys/keyImport.js';
 import { chainRegistry } from '../chain/registry.js';
-import type { Account, VaultData, ChainConfig } from '@open-wallet/shared';
-import { generateId, toHex, wipeBytes } from '@open-wallet/shared';
+import type { Account, VaultData, ChainConfig } from '@7xcircle/shared';
+import { generateId, toHex, wipeBytes } from '@7xcircle/shared';
 
 /** A parsed key held in RAM for key-imported sessions */
 interface LiveKey {

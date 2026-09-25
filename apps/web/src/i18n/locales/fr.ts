@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * Traductions françaises — Interface OpenWallet.
+ * Traductions françaises — Interface 7xCircle Wallet.
  */
 export default {
   // ── Commun ──

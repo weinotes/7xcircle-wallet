@@ -25,7 +25,7 @@ import * as SecureStore from 'expo-secure-store';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { registerAllChains } from '@open-wallet/chains';
+import { registerAllChains } from '@7xcircle/chains';
 import {
   createMnemonic,
   encodeVaultSecret,
@@ -34,8 +34,8 @@ import {
   isValidMnemonic,
   unlock as unlockSession,
   lock as lockSession,
-} from '@open-wallet/core';
-import type { Account, VaultData } from '@open-wallet/shared';
+} from '@7xcircle/core';
+import type { Account, VaultData } from '@7xcircle/shared';
 import { PRODUCTION_CHAINS } from './src/chains';
 import { Button, Centered } from './src/components';
 import { colors, styles as ui } from './src/theme';
@@ -51,8 +51,7 @@ import { Swap } from './src/screens/Swap';
 import { Earn } from './src/screens/Earn';
 import { Dapps } from './src/screens/Dapps';
 import { Settings } from './src/screens/Settings';
-
-const VAULT_KEY = 'open-wallet-mobile-vault';
+import { VAULT_KEY, migrateLegacyKeys } from './src/migrateKeys';
 
 type Screen = 'loading' | 'welcome' | 'create' | 'import' | 'password' | 'wallet';
 type Tab = 'home' | 'swap' | 'earn' | 'dapps' | 'settings';
@@ -80,7 +79,13 @@ export default function App() {
 
   useEffect(() => {
     registerAllChains();
-    SecureStore.getItemAsync(VAULT_KEY).then(raw => {
+    // One-time rename from the pre-rebrand SecureStore keys; if the vault
+    // somehow still sits under the legacy name, read it from there instead
+    // of showing the onboarding over an existing wallet.
+    void migrateLegacyKeys()
+      .then(() => SecureStore.getItemAsync(VAULT_KEY))
+      .then(raw => raw ?? SecureStore.getItemAsync('open-wallet-mobile-vault'))
+      .then(raw => {
       if (raw) {
         setVault(JSON.parse(raw) as VaultData);
         setScreen('welcome');

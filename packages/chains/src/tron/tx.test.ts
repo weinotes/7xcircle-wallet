@@ -22,8 +22,8 @@ import { describe, it, expect } from 'vitest';
 import { secp256k1 } from '@noble/curves/secp256k1';
 import { sha256 } from '@noble/hashes/sha256';
 
-import { fromHex, toHex } from '@open-wallet/shared';
-import type { TxIntent } from '@open-wallet/shared';
+import { fromHex, toHex } from '@7xcircle/shared';
+import type { TxIntent } from '@7xcircle/shared';
 
 import { publicKeyToTronAddress, tronAddressToBytes } from './address.js';
 import { varint, encodeRawData, encodeContract, encodeTransferContract, CONTRACT_TYPE_TRANSFER, CONTRACT_TYPE_TRIGGER_SMART_CONTRACT } from './protobuf.js';

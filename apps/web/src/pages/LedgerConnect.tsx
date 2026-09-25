@@ -26,10 +26,10 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Usb, Check, ShieldCheck } from 'lucide-react';
-import { Button } from '@open-wallet/ui';
-import { generateId } from '@open-wallet/shared';
-import type { Account } from '@open-wallet/shared';
-import { chainRegistry } from '@open-wallet/core';
+import { Button } from '@7xcircle/ui';
+import { generateId } from '@7xcircle/shared';
+import type { Account } from '@7xcircle/shared';
+import { chainRegistry } from '@7xcircle/core';
 import { useWalletStore } from '../store/wallet.js';
 import {
   browseLedgerAccounts,

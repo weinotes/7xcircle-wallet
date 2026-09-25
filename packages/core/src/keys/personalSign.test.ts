@@ -22,7 +22,7 @@
 import { describe, it, expect } from 'vitest';
 import { keccak_256 } from '@noble/hashes/sha3';
 
-import { toHex } from '@open-wallet/shared';
+import { toHex } from '@7xcircle/shared';
 import {
   hashPersonalMessage,
   messageParamToBytes,

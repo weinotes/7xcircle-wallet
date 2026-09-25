@@ -1,12 +1,12 @@
 /**
- * Global app styles. Uses design tokens from @open-wallet/ui/tokens.css.
+ * Global app styles. Uses design tokens from @7xcircle/ui/tokens.css.
  *
  * Two jobs:
  *   1. Base resets + cross-script typography/scrollbar polish
  *   2. A small utility-class layer (.ow-page / .ow-card / .ow-row-between /
  *      .ow-mono …) so pages compose classes instead of re-authoring the
  *      same inline-style objects. Component-level styling still belongs in
- *      @open-wallet/ui.
+ *      @7xcircle/ui.
  */
 
 * {

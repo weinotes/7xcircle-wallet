@@ -30,7 +30,7 @@ import bs58 from 'bs58';
 import { keccak_256 } from '@noble/hashes/sha3';
 import { sha256 } from '@noble/hashes/sha256';
 
-import { fromHex, toHex } from '@open-wallet/shared';
+import { fromHex, toHex } from '@7xcircle/shared';
 
 /** TRON address version byte (mainnet and testnets alike) */
 export const TRON_ADDRESS_PREFIX = 0x41;

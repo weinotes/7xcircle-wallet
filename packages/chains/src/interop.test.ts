@@ -36,12 +36,12 @@ import {
   deriveSolanaPrivateKey,
   evmPublicKey,
   solanaPublicKey,
-} from '@open-wallet/core';
+} from '@7xcircle/core';
 import { getChainConfig } from './configs.js';
 import { EvmAdapter } from './evm/adapter.js';
 import { SolanaAdapter } from './solana/adapter.js';
 import { publicKeyToTronAddress } from './tron/address.js';
-import { toHex } from '@open-wallet/shared';
+import { toHex } from '@7xcircle/shared';
 
 const TEST_MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';

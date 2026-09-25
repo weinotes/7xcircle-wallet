@@ -30,8 +30,8 @@ import { DappApprovals } from './pages/DappApprovals.js';
 import { LedgerConnect } from './pages/LedgerConnect.js';
 import { useWalletStore } from './store/wallet.js';
 import { useThemeSync } from './hooks/useThemeSync.js';
-import { registerAllChains } from '@open-wallet/chains';
-import { touchActivity } from '@open-wallet/core';
+import { registerAllChains } from '@7xcircle/chains';
+import { touchActivity } from '@7xcircle/core';
 
 // Register chain adapters once at app startup
 registerAllChains();

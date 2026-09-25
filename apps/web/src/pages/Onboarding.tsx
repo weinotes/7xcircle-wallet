@@ -26,11 +26,11 @@
 
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { createMnemonic, isValidMnemonic, evaluatePassword, encryptVault, encodeVaultSecret, parsePrivateKey, base58Encode } from '@open-wallet/core';
-import type { VaultKeyEntry } from '@open-wallet/core';
-import { Button, Input } from '@open-wallet/ui';
+import { createMnemonic, isValidMnemonic, evaluatePassword, encryptVault, encodeVaultSecret, parsePrivateKey, base58Encode } from '@7xcircle/core';
+import type { VaultKeyEntry } from '@7xcircle/core';
+import { Button, Input } from '@7xcircle/ui';
 import { useWalletStore } from '../store/wallet.js';
-import { CHAIN_CONFIGS } from '@open-wallet/chains';
+import { CHAIN_CONFIGS } from '@7xcircle/chains';
 
 type Step = 'choice' | 'create' | 'verify' | 'import' | 'password';
 

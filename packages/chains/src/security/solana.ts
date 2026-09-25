@@ -33,7 +33,7 @@
  * Verdict logic is pure and unit-tested; the adapter supplies the RPC values.
  */
 
-import type { TokenSafetyReport } from '@open-wallet/core';
+import type { TokenSafetyReport } from '@7xcircle/core';
 
 /** Single-holder share above which concentration is worth flagging, percent */
 const TOP_HOLDER_WARN_PCT = 50;

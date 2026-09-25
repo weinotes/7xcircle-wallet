@@ -41,12 +41,12 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Lock, Send, ArrowLeftRight, TrendingUp, ArrowDownToLine, History as HistoryIcon, Settings, ArrowUpRight, ArrowDownLeft, Coins, RefreshCw, Plug, Copy, Check, ChevronDown } from 'lucide-react';
-import { Button, IconButton, Card, ListRow, Skeleton, EmptyState } from '@open-wallet/ui';
+import { Button, IconButton, Card, ListRow, Skeleton, EmptyState } from '@7xcircle/ui';
 import { useWalletStore } from '../store/wallet.js';
-import { chainRegistry } from '@open-wallet/core';
-import { CHAIN_CONFIGS, priceTokens, totalUsd } from '@open-wallet/chains';
-import { formatBalance, formatUsd } from '@open-wallet/shared';
-import type { TokenBalance } from '@open-wallet/shared';
+import { chainRegistry } from '@7xcircle/core';
+import { CHAIN_CONFIGS, priceTokens, totalUsd } from '@7xcircle/chains';
+import { formatBalance, formatUsd } from '@7xcircle/shared';
+import type { TokenBalance } from '@7xcircle/shared';
 import { useTransactionHistory } from '../hooks/useTransactionHistory.js';
 
 export function Home() {

@@ -34,7 +34,7 @@ import type {
   TransactionRecord,
   TxIntent,
   UnsignedTx,
-} from '@open-wallet/shared';
+} from '@7xcircle/shared';
 
 /** Options for building / estimating a transaction */
 export interface BuildOpts {

@@ -28,7 +28,7 @@
 import { secp256k1 } from '@noble/curves/secp256k1';
 import { keccak_256 } from '@noble/hashes/sha3';
 
-import { fromHex, toHex } from '@open-wallet/shared';
+import { fromHex, toHex } from '@7xcircle/shared';
 
 /** Decode a personal_sign message param into the bytes to prefix-hash */
 export function messageParamToBytes(message: string): Uint8Array {

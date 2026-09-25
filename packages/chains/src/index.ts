@@ -30,7 +30,7 @@ export * from './security/solana.js';
 export * from './pricing/price.js';
 export * from './yield/lifi.js';
 
-import { chainRegistry } from '@open-wallet/core';
+import { chainRegistry } from '@7xcircle/core';
 import { EvmAdapter } from './evm/adapter.js';
 import { SolanaAdapter } from './solana/adapter.js';
 import { TronAdapter } from './tron/adapter.js';

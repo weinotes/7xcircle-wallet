@@ -30,7 +30,7 @@ import {
   type VaultData,
   fromHex,
   toHex,
-} from '@open-wallet/shared';
+} from '@7xcircle/shared';
 
 /** Convert string to UTF-8 bytes */
 function strToBytes(str: string): Uint8Array {

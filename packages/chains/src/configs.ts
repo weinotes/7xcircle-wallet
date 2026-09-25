@@ -25,7 +25,7 @@
  * Asset compat outranks coin-type purity.
  */
 
-import type { ChainConfig } from '@open-wallet/shared';
+import type { ChainConfig } from '@7xcircle/shared';
 
 /** All built-in chain configurations */
 export const CHAIN_CONFIGS: ChainConfig[] = [

@@ -28,7 +28,7 @@ import bs58 from 'bs58';
 import { secp256k1 } from '@noble/curves/secp256k1';
 import { keccak_256 } from '@noble/hashes/sha3';
 
-import { fromHex, toHex } from '@open-wallet/shared';
+import { fromHex, toHex } from '@7xcircle/shared';
 import {
   bytesToTronAddress,
   isValidTronAddress,

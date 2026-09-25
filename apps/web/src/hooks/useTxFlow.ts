@@ -27,9 +27,9 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { isUnlocked, touchActivity } from '@open-wallet/core';
+import { isUnlocked, touchActivity } from '@7xcircle/core';
 import { signForAccount } from '../hw/signFor.js';
-import type { ChainAdapter } from '@open-wallet/core';
+import type { ChainAdapter } from '@7xcircle/core';
 import type {
   Account,
   ExternalTx,
@@ -38,7 +38,7 @@ import type {
   TransactionRecord,
   TxIntent,
   UnsignedTx,
-} from '@open-wallet/shared';
+} from '@7xcircle/shared';
 import { useWalletStore } from '../store/wallet.js';
 
 export type TxFlowStatus =

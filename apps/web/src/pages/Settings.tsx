@@ -19,13 +19,13 @@
 
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Trash2, ChevronDown, Check, Usb } from 'lucide-react';
-import { Button, Modal } from '@open-wallet/ui';
+import { Button, Modal } from '@7xcircle/ui';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useWalletStore } from '../store/wallet.js';
 import { SecretKeys } from './SecretKeys.js';
-import { LANGUAGES } from '@open-wallet/shared';
-import type { AppLanguage } from '@open-wallet/shared';
+import { LANGUAGES } from '@7xcircle/shared';
+import type { AppLanguage } from '@7xcircle/shared';
 
 /** Native display name for each supported language */
 const LANGUAGE_LABELS: Record<AppLanguage, string> = {

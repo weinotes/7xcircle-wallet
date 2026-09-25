@@ -34,8 +34,8 @@ import {
   exportAccountPrivateKey,
   revealRecoveryPhrase,
   isUnlocked,
-} from '@open-wallet/core';
-import type { Account } from '@open-wallet/shared';
+} from '@7xcircle/core';
+import type { Account } from '@7xcircle/shared';
 import { registerAllChains, CHAIN_CONFIGS } from './index.js';
 
 const EVM_PK1 = '0x' + '00'.repeat(31) + '01';

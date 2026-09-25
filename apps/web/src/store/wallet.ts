@@ -30,10 +30,10 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { VaultData, Account, TransactionRecord, AppLanguage } from '@open-wallet/shared';
-import { APP_NAME, DEFAULT_THEME, detectSystemLanguage } from '@open-wallet/shared';
-import type { ChainConfig } from '@open-wallet/shared';
-import { unlock as sessionUnlock, lock as sessionLock } from '@open-wallet/core';
+import type { VaultData, Account, TransactionRecord, AppLanguage } from '@7xcircle/shared';
+import { APP_NAME, DEFAULT_THEME, detectSystemLanguage } from '@7xcircle/shared';
+import type { ChainConfig } from '@7xcircle/shared';
+import { unlock as sessionUnlock, lock as sessionLock } from '@7xcircle/core';
 
 /** In-memory pending txs — chainId → list of locally-known transactions */
 type PendingTxMap = Record<string, TransactionRecord[]>;

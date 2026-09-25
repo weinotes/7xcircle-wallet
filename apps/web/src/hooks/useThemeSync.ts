@@ -18,7 +18,7 @@ import { useWalletStore } from '../store/wallet.js';
 
 /**
  * Reflect the store's theme onto `:root[data-theme]`, which is the hook the
- * design tokens in @open-wallet/ui/tokens.css switch on. Without this the
+ * design tokens in @7xcircle/ui/tokens.css switch on. Without this the
  * Settings theme toggle updates Zustand but nothing repaints.
  *
  * Shared by the web SPA and the extension popup shell.

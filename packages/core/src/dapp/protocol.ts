@@ -28,7 +28,7 @@
  *   reject   — unauthorized / unsupported / locked
  */
 
-import type { ChainType } from '@open-wallet/shared';
+import type { ChainType } from '@7xcircle/shared';
 
 // ─── permissions ────────────────────────────────────────────────────
 

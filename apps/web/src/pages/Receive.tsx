@@ -28,9 +28,9 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Copy, Check, QrCode } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, IconButton, EmptyState } from '@open-wallet/ui';
+import { Button, Card, IconButton, EmptyState } from '@7xcircle/ui';
 import { useWalletStore } from '../store/wallet.js';
-import { CHAIN_CONFIGS } from '@open-wallet/chains';
+import { CHAIN_CONFIGS } from '@7xcircle/chains';
 import { QRCodeSVG } from 'qrcode.react';
 
 export function Receive() {

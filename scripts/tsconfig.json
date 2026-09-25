@@ -11,9 +11,9 @@
     "noEmit": true,
     "baseUrl": "..",
     "paths": {
-      "@open-wallet/shared": ["packages/shared/src/index.ts"],
-      "@open-wallet/core": ["packages/core/src/index.ts"],
-      "@open-wallet/chains": ["packages/chains/src/index.ts"],
+      "@7xcircle/shared": ["packages/shared/src/index.ts"],
+      "@7xcircle/core": ["packages/core/src/index.ts"],
+      "@7xcircle/chains": ["packages/chains/src/index.ts"],
       "viem": ["packages/chains/node_modules/viem"],
       "viem/accounts": ["packages/chains/node_modules/viem/accounts"],
       "@solana/web3.js": ["packages/chains/node_modules/@solana/web3.js"],

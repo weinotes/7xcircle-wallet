@@ -38,8 +38,8 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ArrowRight, Loader2, CheckCircle2, XCircle, Coins, Wallet, ChevronDown, ListPlus } from 'lucide-react';
-import { Button, Input, Modal } from '@open-wallet/ui';
-import { chainRegistry } from '@open-wallet/core';
+import { Button, Input, Modal } from '@7xcircle/ui';
+import { chainRegistry } from '@7xcircle/core';
 import { useWalletStore } from '../store/wallet.js';
 import {
   CHAIN_CONFIGS,
@@ -55,9 +55,9 @@ import {
   type ResourceOrder,
   type SignedTxPayload,
   type TronResourceEstimate,
-} from '@open-wallet/chains';
-import { formatBalance } from '@open-wallet/shared';
-import type { FeeTier, TokenBalance, TxIntent } from '@open-wallet/shared';
+} from '@7xcircle/chains';
+import { formatBalance } from '@7xcircle/shared';
+import type { FeeTier, TokenBalance, TxIntent } from '@7xcircle/shared';
 import { useTxFlow } from '../hooks/useTxFlow.js';
 import { signForAccount } from '../hw/signFor.js';
 

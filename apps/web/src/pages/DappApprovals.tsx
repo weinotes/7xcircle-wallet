@@ -30,19 +30,19 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ShieldAlert, Signature, Send as SendIcon, Plug } from 'lucide-react';
-import { Button } from '@open-wallet/ui';
+import { Button } from '@7xcircle/ui';
 import {
   chainRegistry,
   getPrivateKey,
   grantPermission,
   signPersonalMessage,
   touchActivity,
-} from '@open-wallet/core';
+} from '@7xcircle/core';
 import { useWalletStore } from '../store/wallet.js';
 import { signForAccount } from '../hw/signFor.js';
 import { ledgerPathOf, ledgerSignMessage, openEthApp } from '../hw/ledger.js';
-import { CHAIN_CONFIGS } from '@open-wallet/chains';
-import type { SitePermission } from '@open-wallet/core';
+import { CHAIN_CONFIGS } from '@7xcircle/chains';
+import type { SitePermission } from '@7xcircle/core';
 
 interface PendingRequest {
   id: string;

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * 한국어 번역 — OpenWallet UI.
+ * 한국어 번역 — 7xCircle Wallet UI.
  */
 export default {
   // ── 공통 ──

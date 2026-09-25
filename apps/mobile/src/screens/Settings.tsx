@@ -25,8 +25,8 @@
 import { useState } from 'react';
 import { Linking, ScrollView, Text, TextInput, View } from 'react-native';
 import Constants from 'expo-constants';
-import { decryptVault } from '@open-wallet/core';
-import type { VaultData } from '@open-wallet/shared';
+import { decryptVault } from '@7xcircle/core';
+import type { VaultData } from '@7xcircle/shared';
 import { Button } from '../components';
 import { UPDATE_REPO } from '../config';
 import { isNewer } from '../update';

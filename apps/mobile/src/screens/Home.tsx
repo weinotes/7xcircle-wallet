@@ -22,10 +22,10 @@
 
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { chainRegistry } from '@open-wallet/core';
-import { priceTokens, totalUsd } from '@open-wallet/chains';
-import type { Account, TokenBalance } from '@open-wallet/shared';
-import { formatBalance, formatUsd } from '@open-wallet/shared';
+import { chainRegistry } from '@7xcircle/core';
+import { priceTokens, totalUsd } from '@7xcircle/chains';
+import type { Account, TokenBalance } from '@7xcircle/shared';
+import { formatBalance, formatUsd } from '@7xcircle/shared';
 import { Button, shorten } from '../components';
 import { orderedChains } from '../chains';
 import { sendTx } from '../tx';

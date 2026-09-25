@@ -23,16 +23,16 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { chainRegistry } from '@open-wallet/core';
+import { chainRegistry } from '@7xcircle/core';
 import {
   SWAP_TOKEN_OPTIONS,
   fetchQuote,
   fetchSwapTransaction,
   type JupiterQuote,
   type SwapTokenOption,
-} from '@open-wallet/chains';
-import { formatBalance, parseAmount } from '@open-wallet/shared';
-import type { Account } from '@open-wallet/shared';
+} from '@7xcircle/chains';
+import { formatBalance, parseAmount } from '@7xcircle/shared';
+import type { Account } from '@7xcircle/shared';
 import { Button, shorten } from '../components';
 import { sendExternalTx } from '../tx';
 import { styles } from '../theme';

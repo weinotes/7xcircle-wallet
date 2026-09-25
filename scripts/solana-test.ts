@@ -30,7 +30,7 @@
 import { deriveSolanaPrivateKey, solanaPublicKey, createMnemonic } from '../packages/core/src/keys/mnemonic.js';
 import { SolanaAdapter } from '../packages/chains/src/solana/adapter.js';
 import { PublicKey, Connection, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import type { ChainConfig } from '@open-wallet/shared';
+import type { ChainConfig } from '@7xcircle/shared';
 
 /** Devnet config (not in CHAIN_CONFIGS — mainnet-only there) */
 const DEVNET_CONFIG: ChainConfig = {

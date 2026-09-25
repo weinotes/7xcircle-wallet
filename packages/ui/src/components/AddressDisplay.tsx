@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import * as React from 'react';
-import { shortenAddress } from '@open-wallet/shared';
+import { shortenAddress } from '@7xcircle/shared';
 
 export interface AddressDisplayProps {
   address: string;

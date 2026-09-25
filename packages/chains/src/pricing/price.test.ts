@@ -19,7 +19,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { TokenBalance } from '@open-wallet/shared';
+import type { TokenBalance } from '@7xcircle/shared';
 
 import {
   buildDexScreenerUrl,

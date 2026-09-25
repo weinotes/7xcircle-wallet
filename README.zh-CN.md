@@ -39,7 +39,7 @@
 ## 仓库结构
 
 ```
-open-wallet/
+7xcircle-wallet/
 ├── apps/
 │   ├── web/          # Web 应用（React + Vite）
 │   ├── extension/    # Chrome/Chromium MV3 浏览器插件
@@ -59,14 +59,14 @@ pnpm install
 pnpm dev          # 启动 Web 应用（Vite 开发服务器）
 pnpm build        # 构建所有包 + Web
 pnpm typecheck    # 全工作区类型检查
-pnpm --filter @open-wallet/mobile start   # 启动 Android 开发环境
-pnpm --filter @open-wallet/mobile android  # 在 Android 设备或模拟器运行
+pnpm --filter @7xcircle/mobile start   # 启动 Android 开发环境
+pnpm --filter @7xcircle/mobile android  # 在 Android 设备或模拟器运行
 ```
 
 ### Android 版本
 
 Android 客户端使用 Expo / React Native，并复用同一套钱包核心和链适配器。加密后的 Vault 使用 Android SecureStore 保存。安装 Android Studio 和 SDK 后，
-执行 `pnpm --filter @open-wallet/mobile android` 即可构建并运行。
+执行 `pnpm --filter @7xcircle/mobile android` 即可构建并运行。
 移动端现已覆盖全部主网链（切换器以 TRON（TRX + USDT-TRC20）、BNB Chain、Solana、
 Ethereum 优先排列），展示各链适配器发现的代币余额，原生与代币转账走与 Web 端相同的
 链无关 intent 流水线；并支持可选的指纹/面容解锁（密码缓存由 Android Keystore 生物识别
@@ -74,7 +74,7 @@ Ethereum 优先排列），展示各链适配器发现的代币余额，原生�
 
 ### 浏览器插件
 
-执行 `pnpm --filter @open-wallet/extension build`，再在 Chrome 或 Chromium
+执行 `pnpm --filter @7xcircle/extension build`，再在 Chrome 或 Chromium
 浏览器中将 `apps/extension/dist` 作为“已解压的扩展程序”加载。
 插件 Popup 支持完整钱包界面，页面注入的 EIP-1193 provider 已支持 BNB 链和
 只读账户发现；交易审批界面仍在继续完善。dApp 兼容性目标为 MetaMask

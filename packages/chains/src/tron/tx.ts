@@ -30,8 +30,8 @@ import { secp256k1 } from '@noble/curves/secp256k1';
 import { sha256 } from '@noble/hashes/sha256';
 import { encodeFunctionData, erc20Abi, type Address } from 'viem';
 
-import { fromHex, toHex } from '@open-wallet/shared';
-import type { TxIntent } from '@open-wallet/shared';
+import { fromHex, toHex } from '@7xcircle/shared';
+import type { TxIntent } from '@7xcircle/shared';
 
 import {
   CONTRACT_TYPE_TRANSFER,

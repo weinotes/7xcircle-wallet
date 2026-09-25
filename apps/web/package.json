@@ -1,5 +1,5 @@
 {
-  "name": "@open-wallet/web",
+  "name": "@7xcircle/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -14,10 +14,10 @@
   "dependencies": {
     "@ledgerhq/hw-app-eth": "^6.42.0",
     "@ledgerhq/hw-transport-webusb": "^6.35.0",
-    "@open-wallet/chains": "workspace:*",
-    "@open-wallet/core": "workspace:*",
-    "@open-wallet/shared": "workspace:*",
-    "@open-wallet/ui": "workspace:*",
+    "@7xcircle/chains": "workspace:*",
+    "@7xcircle/core": "workspace:*",
+    "@7xcircle/shared": "workspace:*",
+    "@7xcircle/ui": "workspace:*",
     "buffer": "^6.0.3",
     "i18next": "^26.4.0",
     "lucide-react": "^0.460.0",

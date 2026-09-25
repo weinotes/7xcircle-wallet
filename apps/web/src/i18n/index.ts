@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * i18next configuration — OpenWallet UI localization.
+ * i18next configuration — 7xCircle Wallet UI localization.
  *
  * Languages: English, 中文, 日本語, Français, 한국어, العربية.
  * Arabic (ar) is RTL — set document.dir in syncLanguage().
@@ -25,7 +25,7 @@
 
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import { detectSystemLanguage } from '@open-wallet/shared';
+import { detectSystemLanguage } from '@7xcircle/shared';
 
 import en from './locales/en.js';
 import zh from './locales/zh.js';

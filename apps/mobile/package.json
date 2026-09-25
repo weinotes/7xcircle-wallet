@@ -1,5 +1,5 @@
 {
-  "name": "@open-wallet/mobile",
+  "name": "@7xcircle/mobile",
   "version": "0.1.0",
   "private": true,
   "main": "index.ts",
@@ -13,9 +13,9 @@
     "clean": "rm -rf .expo dist"
   },
   "dependencies": {
-    "@open-wallet/chains": "workspace:*",
-    "@open-wallet/core": "workspace:*",
-    "@open-wallet/shared": "workspace:*",
+    "@7xcircle/chains": "workspace:*",
+    "@7xcircle/core": "workspace:*",
+    "@7xcircle/shared": "workspace:*",
     "@react-native-async-storage/async-storage": "2.1.2",
     "@react-native-community/netinfo": "11.4.1",
     "@walletconnect/react-native-compat": "^2.25.0",

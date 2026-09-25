@@ -21,7 +21,7 @@
 
 import { describe, it, expect } from 'vitest';
 
-import type { Account } from '@open-wallet/shared';
+import type { Account } from '@7xcircle/shared';
 import { caipAccount, negotiateNamespace, SUPPORTED_METHODS } from './namespaces';
 
 const acc = (chainId: string, address: string): Account => ({

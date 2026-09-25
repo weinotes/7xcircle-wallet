@@ -17,7 +17,7 @@
  * MV3 background — the DApp request broker.
  *
  * Owns NO keys and NO sessions: it transports, gates (via the pure
- * @open-wallet/core dapp protocol), queues, and forwards decisions between
+ * @7xcircle/core dapp protocol), queues, and forwards decisions between
  * content scripts (dApps) and the popup (the only place a session exists).
  *
  * Lifecycle notes (MV3 service worker is ephemeral):
@@ -29,13 +29,13 @@
  *     that at ~5 min, after which the dApp sees a disconnect error
  */
 
-import type { SitePermission } from '@open-wallet/core';
+import type { SitePermission } from '@7xcircle/core';
 import {
   findPermission,
   gate,
   providerErrors,
   revokePermission,
-} from '@open-wallet/core';
+} from '@7xcircle/core';
 
 const KEYS = {
   perms: 'dapp:permissions',

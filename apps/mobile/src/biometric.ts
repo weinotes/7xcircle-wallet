@@ -26,10 +26,11 @@
 
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
+import { BIOMETRIC_ENABLED_KEY, LEGACY_PWD_KEY } from './migrateKeys';
 
 /** SecureStore keys — separate from the vault ciphertext key */
-const PWD_KEY = 'open-wallet-mobile-biometric-password';
-const ENABLED_KEY = 'open-wallet-mobile-biometric-enabled';
+const PWD_KEY = '7xcircle-mobile-biometric-password';
+const ENABLED_KEY = BIOMETRIC_ENABLED_KEY;
 
 export interface BiometricStatus {
   /** Hardware exists, is enrolled, and supports the STRONG class we require */
@@ -89,11 +90,22 @@ export async function savePasswordForBiometrics(password: string): Promise<void>
  * every failure path degrades to the password form, never an error state.
  */
 export async function loadCachedPassword(): Promise<string | null> {
+  const opts = {
+    requireAuthentication: true,
+    authenticationPrompt: 'Unlock 7xCircle Wallet',
+  } as const;
   try {
-    return await SecureStore.getItemAsync(PWD_KEY, {
-      requireAuthentication: true,
-      authenticationPrompt: 'Unlock 7xCircle Wallet',
-    });
+    const fresh = await SecureStore.getItemAsync(PWD_KEY, opts);
+    if (fresh !== null) return fresh;
+    // Pre-rebrand installs keep the cached copy under the legacy key. The
+    // auth prompt already fired for the read above, so retrying there
+    // surfaces no extra dialog — move it and delete the old entry.
+    const legacy = await SecureStore.getItemAsync(LEGACY_PWD_KEY, opts);
+    if (legacy !== null) {
+      await SecureStore.setItemAsync(PWD_KEY, legacy, opts);
+      await SecureStore.deleteItemAsync(LEGACY_PWD_KEY);
+    }
+    return legacy;
   } catch {
     // userAuthFail, revoked biometrics, corrupted item — all mean "password next"
     return null;

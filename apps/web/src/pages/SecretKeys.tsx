@@ -29,8 +29,8 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Copy, Eye, EyeOff, KeyRound, ShieldAlert } from 'lucide-react';
-import { Button, Input } from '@open-wallet/ui';
-import { revealRecoveryPhrase, exportAccountPrivateKey } from '@open-wallet/core';
+import { Button, Input } from '@7xcircle/ui';
+import { revealRecoveryPhrase, exportAccountPrivateKey } from '@7xcircle/core';
 import { useWalletStore } from '../store/wallet.js';
 
 const REVEAL_TTL_MS = 60_000;

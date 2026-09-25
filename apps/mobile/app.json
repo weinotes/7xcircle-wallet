@@ -5,7 +5,7 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "scheme": "openwallet",
+    "scheme": "7xcirclewallet",
     "plugins": [
       "expo-local-authentication",
       "expo-secure-store",
@@ -17,7 +17,7 @@
       ]
     ],
     "android": {
-      "package": "com.openwallet.app",
+      "package": "com.sevencircle.wallet",
       "permissions": [],
       "adaptiveIcon": {
         "backgroundColor": "#101114"

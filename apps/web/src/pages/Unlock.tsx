@@ -28,9 +28,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { KeyRound, Eye, EyeOff } from 'lucide-react';
-import { Button, Input } from '@open-wallet/ui';
+import { Button, Input } from '@7xcircle/ui';
 import { useWalletStore } from '../store/wallet.js';
-import { CHAIN_CONFIGS } from '@open-wallet/chains';
+import { CHAIN_CONFIGS } from '@7xcircle/chains';
 
 export function Unlock() {
   const { t } = useTranslation();

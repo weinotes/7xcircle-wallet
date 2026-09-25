@@ -50,16 +50,16 @@ importers:
 
   apps/extension:
     dependencies:
-      '@open-wallet/chains':
+      '@7xcircle/chains':
         specifier: workspace:*
         version: link:../../packages/chains
-      '@open-wallet/core':
+      '@7xcircle/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@open-wallet/shared':
+      '@7xcircle/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@open-wallet/ui':
+      '@7xcircle/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       buffer:
@@ -111,13 +111,13 @@ importers:
 
   apps/mobile:
     dependencies:
-      '@open-wallet/chains':
+      '@7xcircle/chains':
         specifier: workspace:*
         version: link:../../packages/chains
-      '@open-wallet/core':
+      '@7xcircle/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@open-wallet/shared':
+      '@7xcircle/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@react-native-async-storage/async-storage':
@@ -184,16 +184,16 @@ importers:
       '@ledgerhq/hw-transport-webusb':
         specifier: ^6.35.0
         version: 6.35.0
-      '@open-wallet/chains':
+      '@7xcircle/chains':
         specifier: workspace:*
         version: link:../../packages/chains
-      '@open-wallet/core':
+      '@7xcircle/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@open-wallet/shared':
+      '@7xcircle/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@open-wallet/ui':
+      '@7xcircle/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       buffer:
@@ -254,10 +254,10 @@ importers:
       '@noble/hashes':
         specifier: ^1.6.0
         version: 1.6.0
-      '@open-wallet/core':
+      '@7xcircle/core':
         specifier: workspace:*
         version: link:../core
-      '@open-wallet/shared':
+      '@7xcircle/shared':
         specifier: workspace:*
         version: link:../shared
       '@solana/spl-token':
@@ -294,7 +294,7 @@ importers:
       '@noble/hashes':
         specifier: ^1.6.0
         version: 1.6.0
-      '@open-wallet/shared':
+      '@7xcircle/shared':
         specifier: workspace:*
         version: link:../shared
       '@scure/bip32':
@@ -331,7 +331,7 @@ importers:
 
   packages/ui:
     dependencies:
-      '@open-wallet/shared':
+      '@7xcircle/shared':
         specifier: workspace:*
         version: link:../shared
       lucide-react:

@@ -1,5 +1,5 @@
 {
-  "name": "@open-wallet/core",
+  "name": "@7xcircle/core",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -26,7 +26,7 @@
   "dependencies": {
     "@noble/curves": "^1.8.0",
     "@noble/hashes": "^1.6.0",
-    "@open-wallet/shared": "workspace:*",
+    "@7xcircle/shared": "workspace:*",
     "@scure/bip32": "^2.4.0",
     "bip39": "^3.1.0",
     "tweetnacl": "^1.0.3"

@@ -30,9 +30,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { chainRegistry } from '@open-wallet/core';
+import { chainRegistry } from '@7xcircle/core';
 import { useWalletStore } from '../store/wallet.js';
-import type { TransactionRecord } from '@open-wallet/shared';
+import type { TransactionRecord } from '@7xcircle/shared';
 
 export interface UseTransactionHistoryResult {
   transactions: TransactionRecord[];

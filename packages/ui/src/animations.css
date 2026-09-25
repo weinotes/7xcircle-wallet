@@ -1,5 +1,5 @@
 /**
- * Shared keyframes for @open-wallet/ui components (Spinner uses `ow-spin`,
+ * Shared keyframes for @7xcircle/ui components (Spinner uses `ow-spin`,
  * Skeleton uses `ow-shimmer`). Imported by tokens.css so any app that loads
  * the design system also gets the animations it references.
  */

@@ -64,8 +64,8 @@ import type {
   TransactionRecord,
   TxIntent,
   UnsignedTx,
-} from '@open-wallet/shared';
-import type { BuildOpts, ChainAdapter, TokenSafetyReport } from '@open-wallet/core';
+} from '@7xcircle/shared';
+import type { BuildOpts, ChainAdapter, TokenSafetyReport } from '@7xcircle/core';
 import { toEip55Address, validateEip55Address } from './utils.js';
 import { ExplorerClient, type ExplorerNativeTx, type ExplorerTokenTx } from './explorer.js';
 import { compileIntent, decodeUint256, encodeAllowance } from './intent.js';

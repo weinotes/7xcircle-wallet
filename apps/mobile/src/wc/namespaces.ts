@@ -26,7 +26,7 @@
  *     chain is broken by spec anyway)
  */
 
-import type { Account } from '@open-wallet/shared';
+import type { Account } from '@7xcircle/shared';
 import { evmChainFromCaip } from '../chains';
 
 /** Methods this wallet answers over WalletConnect */

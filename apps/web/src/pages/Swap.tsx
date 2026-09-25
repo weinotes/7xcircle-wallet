@@ -39,8 +39,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ArrowDownUp, Loader2, ExternalLink } from 'lucide-react';
-import { Button, Input } from '@open-wallet/ui';
-import { chainRegistry } from '@open-wallet/core';
+import { Button, Input } from '@7xcircle/ui';
+import { chainRegistry } from '@7xcircle/core';
 import {
   CHAIN_CONFIGS,
   SWAP_TOKEN_OPTIONS,
@@ -54,9 +54,9 @@ import {
   zeroExQuoteToIntents,
   type JupiterQuote,
   type ZeroExQuote,
-} from '@open-wallet/chains';
-import { formatBalance, parseAmount } from '@open-wallet/shared';
-import type { TxIntent } from '@open-wallet/shared';
+} from '@7xcircle/chains';
+import { formatBalance, parseAmount } from '@7xcircle/shared';
+import type { TxIntent } from '@7xcircle/shared';
 import { useWalletStore } from '../store/wallet.js';
 import { useTxFlow } from '../hooks/useTxFlow.js';
 import {

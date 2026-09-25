@@ -30,7 +30,7 @@ import { secp256k1 } from '@noble/curves/secp256k1';
 import { ed25519 } from '@noble/curves/ed25519';
 import { hmac } from '@noble/hashes/hmac';
 import { sha512 } from '@noble/hashes/sha512';
-import { toHex, fromHex, wipeBytes } from '@open-wallet/shared';
+import { toHex, fromHex, wipeBytes } from '@7xcircle/shared';
 
 /**
  * Generate a mnemonic using CSPRNG.
