@@ -17,10 +17,17 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    // Run all test files across the monorepo
+    // Run all test files across the monorepo.
+    //
+    // NOTE: this pattern must work from BOTH the repo root (coverage job)
+    // and each package's own cwd (the turbo `test` task). Vitest resolves
+    // `include` against the current root; when a package runs `vitest run`
+    // from its own directory it finds this config via upward lookup but
+    // keeps its own cwd as root — so a repo-root-relative pattern like
+    // `packages/*/src/**` would match nothing and fail the suite with
+    // "No test files found". `**/src/**` matches in both contexts.
     include: [
-      'packages/*/src/**/*.test.ts',
-      'apps/*/src/**/*.test.ts',
+      '**/src/**/*.test.ts',
     ],
     // Exclude dist, node_modules, and E2E tests
     exclude: [
@@ -48,6 +55,10 @@ export default defineConfig({
         '**/*.spec.ts',
         '**/index.ts',
         '**/types.ts',
+        // Types-only interface files that don't match `types.ts`: v8 reports
+        // them as 0/0, which reads as "untested" in the report even though
+        // there is nothing executable in them.
+        'packages/core/src/chain/adapter.ts',
         '**/config.ts',
         '**/constants.ts',
         '**/polyfills.ts',
