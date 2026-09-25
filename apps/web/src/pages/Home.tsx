@@ -673,7 +673,9 @@ export function Home() {
                         ? `${formatUsd(tok.priceUsd)} / ${tok.symbol}`
                         : `${tok.decimals} decimals`}
                   </span>
-                  <button
+                  <span
+                    role="button"
+                    tabIndex={0}
                     onClick={(e) => {
                       e.stopPropagation();
                       setChartTarget({
@@ -683,17 +685,29 @@ export function Home() {
                         isNative: tok.isNative,
                       });
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setChartTarget({
+                          chainId: activeChainId,
+                          address: tok.address,
+                          symbol: tok.symbol,
+                          isNative: tok.isNative,
+                        });
+                      }
+                    }}
                     style={{
-                      background: 'none',
-                      border: 'none',
                       cursor: 'pointer',
                       color: 'var(--ow-text-tertiary)',
                       padding: 4,
+                      display: 'inline-flex',
+                      alignItems: 'center',
                     }}
                     title={t('home.viewChart')}
                   >
                     <BarChart3 size={14} />
-                  </button>
+                  </span>
                 </>
               }
             />

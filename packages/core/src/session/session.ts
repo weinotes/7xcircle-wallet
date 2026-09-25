@@ -333,8 +333,11 @@ export function getPrivateKey(account: Account): Uint8Array {
  * key tree to walk, and hardware accounts come from the device.
  */
 export function deriveMoreAccount(chainId: string): Account {
-  if (!state.unlocked || !state.mnemonicBytes) {
-    throw new Error('Wallet is locked');
+  if (!state.unlocked) {
+    throw new Error('Wallet session is locked — please unlock first');
+  }
+  if (!state.mnemonicBytes) {
+    throw new Error('This wallet was imported from private keys — multi-account is only available for mnemonic wallets');
   }
   const config = chainRegistry.get(chainId)?.config;
   if (!config) {
@@ -344,7 +347,7 @@ export function deriveMoreAccount(chainId: string): Account {
   const existing = state.accounts.filter(a => a.chainId === chainId && a.source !== 'key');
   const nextIndex = existing.reduce((max, a) => Math.max(max, a.accountIndex + 1), 0);
   if (nextIndex >= MAX_ACCOUNTS_PER_CHAIN) {
-    throw new Error(`At most ${MAX_ACCOUNTS_PER_CHAIN} accounts per chain`);
+    throw new Error(`Maximum ${MAX_ACCOUNTS_PER_CHAIN} accounts per chain reached`);
   }
 
   touchActivity();
