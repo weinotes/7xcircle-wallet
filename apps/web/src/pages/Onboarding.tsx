@@ -53,8 +53,9 @@ function buildVerifyQuiz(words: string[], count = 3): {
 
   const options = positions.map(pos => {
     const correct = words[pos];
-    // Pick 3 distractors from the rest
-    const distractors = shuffled.filter(w => w !== correct).slice(0, 3);
+    // Pick 3 distractors from the rest — deduped so a phrase with repeated
+    // words can never render the same option twice (React keys + clicks)
+    const distractors = [...new Set(shuffled.filter(w => w !== correct))].slice(0, 3);
     const all = [correct, ...distractors].sort(() => Math.random() - 0.5);
     return all;
   });
@@ -236,8 +237,8 @@ export function Onboarding() {
         <div style={{ textAlign: 'center', color: 'var(--ow-text-secondary)' }}>
           {t('onboarding.slogan')}
         </div>
-        <Button size="lg" onClick={handleCreateNew}>{t('onboarding.createNewWallet')}</Button>
-        <Button variant="secondary" size="lg" onClick={handleImport}>{t('onboarding.importExistingWallet')}</Button>
+        <Button size="lg" onClick={handleCreateNew} data-testid="onboarding-create">{t('onboarding.createNewWallet')}</Button>
+        <Button variant="secondary" size="lg" onClick={handleImport} data-testid="onboarding-import">{t('onboarding.importExistingWallet')}</Button>
         <div style={{ textAlign: 'center', fontSize: 'var(--ow-font-size-xs)', color: 'var(--ow-text-tertiary)' }}>
           {t('onboarding.license')}
         </div>
@@ -274,7 +275,7 @@ export function Onboarding() {
         <div style={{ color: 'var(--ow-text-secondary)', fontSize: 'var(--ow-font-size-sm)', textAlign: 'center' }}>
           {t('onboarding.writeWords', { count: words.length })}
         </div>
-        <div style={{
+        <div data-testid="phrase-words" style={{
           backgroundColor: 'var(--ow-bg-tertiary)',
           padding: 'var(--ow-space-4)',
           borderRadius: 'var(--ow-radius-md)',
@@ -294,7 +295,7 @@ export function Onboarding() {
                 padding: '2px 4px',
               }}>
                 <span style={{ color: 'var(--ow-text-tertiary)', minWidth: '24px', textAlign: 'right' }}>{i + 1}.</span>
-                <span>{w}</span>
+                <span data-testid={`phrase-word-${i}`}>{w}</span>
               </div>
             ))}
           </div>
@@ -302,7 +303,7 @@ export function Onboarding() {
         <div style={{ color: 'var(--ow-error)', fontSize: 'var(--ow-font-size-xs)', textAlign: 'center' }}>
           {t('onboarding.neverShare')}
         </div>
-        <Button onClick={handleVerifyNext}>{t('onboarding.savedContinue')}</Button>
+        <Button onClick={handleVerifyNext} data-testid="phrase-saved">{t('onboarding.savedContinue')}</Button>
       </div>
     );
   }
@@ -321,7 +322,7 @@ export function Onboarding() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--ow-space-4)' }}>
           {verify.positions.map((pos, idx) => (
-            <div key={pos}>
+            <div key={pos} data-testid={`verify-question-${idx}`}>
               <div style={{
                 fontSize: 'var(--ow-font-size-sm)',
                 color: 'var(--ow-text-tertiary)',
@@ -339,6 +340,7 @@ export function Onboarding() {
                   return (
                     <button
                       key={opt}
+                      data-testid={`verify-option-${pos}-${opt}`}
                       onClick={() => { setError(''); setVerifyAnswers(prev => ({ ...prev, [pos]: opt })); }}
                       style={{
                         padding: 'var(--ow-space-3)',
@@ -371,7 +373,7 @@ export function Onboarding() {
           </div>
         )}
 
-        <Button onClick={handleVerifySubmit} disabled={!allCorrect}>
+        <Button onClick={handleVerifySubmit} disabled={!allCorrect} data-testid="verify-continue">
           {t('common.continue')}
         </Button>
         <Button variant="ghost" onClick={() => go('create')}>← {t('common.back')}</Button>
@@ -493,6 +495,7 @@ export function Onboarding() {
         placeholder={t('onboarding.passwordPlaceholder')}
         value={password}
         onChange={e => setPassword(e.target.value)}
+        data-testid="password-input"
       />
       <Input
         label={t('onboarding.confirmPasswordLabel')}
@@ -501,8 +504,9 @@ export function Onboarding() {
         value={confirmPassword}
         onChange={e => setConfirmPassword(e.target.value)}
         error={error}
+        data-testid="confirm-password-input"
       />
-      <Button onClick={handlePasswordNext} variant="primary" loading={loading}>
+      <Button onClick={handlePasswordNext} variant="primary" loading={loading} data-testid="onboarding-submit">
         {mode === 'create' ? t('onboarding.createWallet') : t('onboarding.importWallet')}
       </Button>
       <Button variant="ghost" onClick={() => go(mode === 'create' ? 'verify' : 'import')}>← {t('common.back')}</Button>

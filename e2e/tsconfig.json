@@ -1,0 +1,14 @@
+{
+  // E2E specs are part of the verification surface — typecheck them with
+  // the rest of the repo so selector/typo bugs fail fast instead of at
+  // Playwright runtime (which is how the broken onboarding selector once
+  // reached CI). Wired into the root `typecheck` script.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false
+  },
+  "include": ["**/*.ts"]
+}

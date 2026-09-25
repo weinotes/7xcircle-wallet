@@ -125,6 +125,7 @@ export function Unlock() {
           if (e.key === 'Enter') handleUnlock();
         }}
         error={error}
+        data-testid="unlock-password"
       />
 
       <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -153,6 +154,7 @@ export function Unlock() {
         loading={loading}
         disabled={!password || loading}
         size="lg"
+        data-testid="unlock-submit"
       >
         {loading ? t('unlock.unlocking') : t('unlock.unlock')}
       </Button>

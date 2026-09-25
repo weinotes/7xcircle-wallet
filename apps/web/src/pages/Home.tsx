@@ -302,9 +302,10 @@ export function Home() {
     </div>
   );
 
-  const actionTile = (to: string, icon: React.ReactNode, label: string) => (
+  const actionTile = (to: string, icon: React.ReactNode, label: string, testId?: string) => (
     <Link
       to={to}
+      data-testid={testId}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -719,7 +720,7 @@ export function Home() {
       {/* Lock left the grid for the header; the auto-fit grid wraps 5-6
           tiles cleanly in web, popup, and every width between. */}
       <nav className="ow-actions" aria-label={t('home.actionsLabel')}>
-        {actionTile('/send', <Send size={20} />, t('home.send'))}
+        {actionTile('/send', <Send size={20} />, t('home.send'), 'action-send')}
         {actionTile('/swap', <ArrowLeftRight size={20} />, t('home.swap'))}
         {actionTile('/earn', <TrendingUp size={20} />, t('home.earn'))}
         {actionTile('/receive', <ArrowDownToLine size={20} />, t('home.receive'))}

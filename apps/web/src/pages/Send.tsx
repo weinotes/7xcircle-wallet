@@ -1161,6 +1161,7 @@ export function Send() {
         placeholder={t('send.recipientPlaceholder')}
         value={recipientInput}
         onChange={e => setRecipientInput(e.target.value)}
+        data-testid="send-recipient"
         error={
           ensStage === 'unresolved'
             ? t('send.unresolvedName', { name: recipientInput.trim() })
@@ -1224,6 +1225,7 @@ export function Send() {
             type="text"
             inputMode="decimal"
             placeholder={t('send.amountPlaceholder')}
+            data-testid="send-amount"
             value={amount}
             onChange={e => {
               const raw = e.target.value.replace(/[^0-9.]/g, '');

@@ -8,7 +8,7 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is an "AS IS" BASIS,
+ * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
@@ -16,14 +16,16 @@
 /**
  * E2E: Onboarding flow — create new wallet.
  *
- * Tests the critical path from first visit through wallet creation:
- *   1. Landing page renders onboarding options
- *   2. "Create New Wallet" shows recovery phrase
- *   3. Phrase verification step works
- *   4. Password creation completes onboarding
- *   5. Home page renders after creation
+ * Covers the critical path from first visit through wallet creation:
+ *   1. Landing page renders both onboarding options
+ *   2. The full create flow (phrase → verify → password) reaches Home
+ *   3. A wrong verification answer is rejected — the quiz is a real gate
+ *
+ * The phrase and quiz answers are read off the screen and replayed, so the
+ * test is deterministic regardless of which words or positions were drawn.
  */
 import { test, expect } from '@playwright/test';
+import { createWalletAndUnlock } from './helpers';
 
 test.describe('Onboarding — Create New Wallet', () => {
   test.beforeEach(async ({ page }) => {
@@ -31,54 +33,40 @@ test.describe('Onboarding — Create New Wallet', () => {
   });
 
   test('landing page shows create and import options', async ({ page }) => {
-    // The onboarding page should have both options visible
-    await expect(page.getByText('Create New Wallet')).toBeVisible();
-    await expect(page.getByText('Import Existing Wallet')).toBeVisible();
+    await expect(page.getByTestId('onboarding-create')).toBeVisible();
+    await expect(page.getByTestId('onboarding-import')).toBeVisible();
   });
 
   test('create wallet flow — phrase → verify → password → home', async ({ page }) => {
-    // Step 1: Click "Create New Wallet"
-    await page.getByText('Create New Wallet').click();
+    await createWalletAndUnlock(page);
+    // createWalletAndUnlock already asserted Home; re-assert here so the
+    // failure mode is obvious if the helper ever drifts.
+    await expect(page.getByTestId('action-send')).toBeVisible();
+  });
 
-    // Step 2: Recovery phrase should be displayed (12 or 24 words)
-    const phraseSection = page.locator('[class*="word"], [data-testid*="word"]').first();
-    // Wait for phrase to render — at least one word element should exist
-    await expect(phraseSection).toBeVisible({ timeout: 10_000 });
+  test('wrong verification word is rejected', async ({ page }) => {
+    await page.getByTestId('onboarding-create').click();
 
-    // Step 3: Click "I've saved it, continue"
-    await page.getByText(/saved.*continue/i).click();
-
-    // Step 4: Verification — select correct words
-    // The verify step asks user to select words for specific positions.
-    // We look for word-position prompts and click the correct option.
-    // Since word positions are randomised, we look for clickable word buttons
-    // and click them in order (the test verifies the flow renders, not the
-    // cryptographic correctness — that's covered by unit tests).
-    const wordButtons = page.locator('button').filter({ hasText: /^[a-z]+$/ });
-    const count = await wordButtons.count();
-    // Click all available word buttons to complete verification
-    for (let i = 0; i < Math.min(count, 24); i++) {
-      if (await wordButtons.nth(i).isVisible()) {
-        await wordButtons.nth(i).click();
-      }
+    // Read the full phrase so we can deliberately pick a WRONG option
+    const words: string[] = [];
+    for (let i = 0; i < 12; i++) {
+      words.push((await page.getByTestId(`phrase-word-${i}`).textContent() ?? '').trim());
     }
+    await page.getByTestId('phrase-saved').click();
 
-    // Step 5: Password creation (may appear if verification was accepted)
-    const passwordInput = page.locator('input[type="password"]').first();
-    if (await passwordInput.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await passwordInput.fill('TestPass123!');
-      // Confirm password
-      const confirmInput = page.locator('input[type="password"]').nth(1);
-      if (await confirmInput.isVisible()) {
-        await confirmInput.fill('TestPass123!');
-      }
-      // Click create wallet
-      await page.getByText(/create wallet/i).click();
-    }
+    // Find the first question and click any option that is NOT its answer
+    const question = page.getByTestId('verify-question-0');
+    const prompt = (await question.textContent()) ?? '';
+    const index = Number((prompt.match(/#\s*(\d+)/) ?? [])[1]) - 1;
+    expect(index).toBeGreaterThanOrEqual(0);
 
-    // Step 6: Should reach home page or unlock page
-    // Either the home page renders (auto-unlock) or the unlock page appears
-    const homeOrUnlock = page.locator('text=/portfolio|unlock|home/i').first();
-    await expect(homeOrUnlock).toBeVisible({ timeout: 15_000 });
+    const options = question.locator('button');
+    const texts = await options.allTextContents();
+    const wrong = texts.map(t => t.trim()).find(t => t !== words[index]);
+    expect(wrong, 'quiz must offer at least one distractor').toBeTruthy();
+    await question.locator('button', { hasText: new RegExp(`^${wrong}$`) }).first().click();
+
+    // The Continue button stays disabled until every position is correct
+    await expect(page.getByTestId('verify-continue')).toBeDisabled();
   });
 });

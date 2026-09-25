@@ -16,7 +16,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
     "clean": "turbo run clean && rm -rf node_modules",
-    "typecheck": "turbo run typecheck && tsc --noEmit -p scripts/tsconfig.json"
+    "typecheck": "turbo run typecheck && tsc --noEmit -p scripts/tsconfig.json && tsc --noEmit -p e2e/tsconfig.json"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
