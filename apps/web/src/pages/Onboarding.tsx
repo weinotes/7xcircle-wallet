@@ -26,7 +26,8 @@
 
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { createMnemonic, isValidMnemonic, evaluatePassword, encryptVault } from '@open-wallet/core';
+import { createMnemonic, isValidMnemonic, evaluatePassword, encryptVault, encodeVaultSecret, parsePrivateKey, base58Encode } from '@open-wallet/core';
+import type { VaultKeyEntry } from '@open-wallet/core';
 import { Button, Input } from '@open-wallet/ui';
 import { useWalletStore } from '../store/wallet.js';
 import { CHAIN_CONFIGS } from '@open-wallet/chains';
@@ -67,6 +68,13 @@ export function Onboarding() {
   const [mode, setMode] = useState<'create' | 'import'>('create');
   const [mnemonic, setMnemonic] = useState('');
   const [importMnemonic, setImportMnemonic] = useState('');
+  /** import sub-mode: recovery phrase vs raw private key(s) */
+  const [importKind, setImportKind] = useState<'phrase' | 'key'>('phrase');
+  const [keyFamily, setKeyFamily] = useState<VaultKeyEntry['family']>('evm');
+  const [keyInput, setKeyInput] = useState('');
+  /** keys staged in the import step, encrypted into the vault at password-set */
+  const [importedKeys, setImportedKeys] = useState<VaultKeyEntry[]>([]);
+  const [wordCount, setWordCount] = useState<12 | 24>(12);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -85,22 +93,62 @@ export function Onboarding() {
 
   const handleCreateNew = () => {
     setMode('create');
-    setMnemonic(createMnemonic());
+    setMnemonic(createMnemonic(wordCount));
     setVerifyAnswers({});
     go('create');
   };
 
+  /** Switching length on the phrase screen regenerates — the old one was never backed up yet */
+  const handleWordCountChange = (n: 12 | 24) => {
+    setWordCount(n);
+    setMnemonic(createMnemonic(n));
+    setVerifyAnswers({});
+  };
+
   const handleImport = () => {
     setMode('import');
+    setImportKind('phrase');
+    setImportedKeys([]);
     go('import');
   };
 
   const handleImportNext = () => {
+    if (importKind === 'key') {
+      handleAddKey();
+      return;
+    }
     if (!isValidMnemonic(importMnemonic)) {
       setError(t('onboarding.invalidMnemonic'));
       return;
     }
     setMnemonic(importMnemonic.trim());
+    go('password');
+  };
+
+  /** Parse + stage one pasted key (canonicalized so export round-trips) */
+  const handleAddKey = () => {
+    try {
+      const parsed = parsePrivateKey(keyFamily, keyInput);
+      const canonical = keyFamily === 'solana'
+        ? base58Encode(parsed.privateKey)
+        : '0x' + Array.from(parsed.privateKey).map(b => b.toString(16).padStart(2, '0')).join('');
+      setImportedKeys(prev => {
+        if (prev.some(k => k.privateKey === canonical)) return prev;
+        return [...prev, { family: keyFamily, privateKey: canonical }];
+      });
+      setKeyInput('');
+      setError('');
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  /** Move from key staging to password creation */
+  const handleKeysDone = () => {
+    if (importedKeys.length === 0) {
+      setError(t('onboarding.noKeysStaged'));
+      return;
+    }
     go('password');
   };
 
@@ -142,7 +190,12 @@ export function Onboarding() {
 
     setLoading(true);
     try {
-      const vault = await encryptVault(mnemonic, password);
+      // Everything the vault holds goes through the envelope — mnemonic HD
+      // or imported raw keys; decodeVaultSecret still reads pre-envelope vaults.
+      const plaintext = mode === 'import' && importKind === 'key'
+        ? encodeVaultSecret({ kind: 'keys', keys: importedKeys })
+        : encodeVaultSecret({ kind: 'mnemonic', mnemonic });
+      const vault = await encryptVault(plaintext, password);
       setVault(vault);
       // Auto-unlock immediately → derive accounts across all chains
       // Router will switch from Onboarding to Home after store.unlocked becomes true
@@ -198,6 +251,26 @@ export function Onboarding() {
     return (
       <div style={cardStyle}>
         <div style={titleStyle}>{t('onboarding.recoveryPhraseTitle')}</div>
+        {/* word length choice — 12 (128-bit) and 24 (256-bit) are both BIP-39 standard */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--ow-space-2)' }}>
+          {([12, 24] as const).map(n => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => handleWordCountChange(n)}
+              style={{
+                padding: 'var(--ow-space-2) var(--ow-space-4)',
+                backgroundColor: wordCount === n ? 'var(--ow-info)' : 'var(--ow-bg-tertiary)',
+                color: wordCount === n ? '#000' : 'var(--ow-text-primary)',
+                border: wordCount === n ? '2px solid var(--ow-info)' : '1px solid var(--ow-border-subtle)',
+                borderRadius: 'var(--ow-radius-md)',
+                cursor: 'pointer',
+              }}
+            >
+              {t('onboarding.wordCountOption', { count: n })}
+            </button>
+          ))}
+        </div>
         <div style={{ color: 'var(--ow-text-secondary)', fontSize: 'var(--ow-font-size-sm)', textAlign: 'center' }}>
           {t('onboarding.writeWords', { count: words.length })}
         </div>
@@ -311,14 +384,97 @@ export function Onboarding() {
     return (
       <div style={cardStyle}>
         <div style={titleStyle}>{t('onboarding.importTitle')}</div>
-        <Input
-          label={t('onboarding.importLabel')}
-          placeholder={t('onboarding.importPlaceholder')}
-          value={importMnemonic}
-          onChange={e => setImportMnemonic(e.target.value)}
-          error={error}
-        />
-        <Button onClick={handleImportNext} disabled={!importMnemonic.trim()}>{t('common.next')}</Button>
+        {/* phrase vs raw private key — TP migrants routinely carry single keys out */}
+        <div style={{ display: 'flex', gap: 'var(--ow-space-2)' }}>
+          {(['phrase', 'key'] as const).map(kind => (
+            <button
+              key={kind}
+              type="button"
+              onClick={() => { setImportKind(kind); setError(''); }}
+              style={{
+                flex: 1,
+                padding: 'var(--ow-space-2)',
+                backgroundColor: importKind === kind ? 'var(--ow-info)' : 'var(--ow-bg-tertiary)',
+                color: importKind === kind ? '#000' : 'var(--ow-text-primary)',
+                border: importKind === kind ? '2px solid var(--ow-info)' : '1px solid var(--ow-border-subtle)',
+                borderRadius: 'var(--ow-radius-md)',
+                cursor: 'pointer',
+              }}
+            >
+              {t(`onboarding.importTab.${kind}`)}
+            </button>
+          ))}
+        </div>
+
+        {importKind === 'phrase' ? (
+          <>
+            <Input
+              label={t('onboarding.importLabel')}
+              placeholder={t('onboarding.importPlaceholder')}
+              value={importMnemonic}
+              onChange={e => setImportMnemonic(e.target.value)}
+              error={error}
+            />
+            <Button onClick={handleImportNext} disabled={!importMnemonic.trim()}>{t('common.next')}</Button>
+          </>
+        ) : (
+          <>
+            <div style={{ display: 'flex', gap: 'var(--ow-space-2)' }}>
+              {(['evm', 'solana', 'tron'] as const).map(fam => (
+                <button
+                  key={fam}
+                  type="button"
+                  onClick={() => setKeyFamily(fam)}
+                  style={{
+                    flex: 1,
+                    padding: 'var(--ow-space-2)',
+                    fontSize: 'var(--ow-font-size-sm)',
+                    backgroundColor: keyFamily === fam ? 'var(--ow-bg-tertiary)' : 'transparent',
+                    color: 'var(--ow-text-primary)',
+                    border: keyFamily === fam ? '2px solid var(--ow-info)' : '1px solid var(--ow-border-subtle)',
+                    borderRadius: 'var(--ow-radius-md)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {t(`onboarding.keyFamily.${fam}`)}
+                </button>
+              ))}
+            </div>
+            <Input
+              label={t('onboarding.keyLabel')}
+              placeholder={t('onboarding.keyPlaceholder')}
+              value={keyInput}
+              onChange={e => setKeyInput(e.target.value)}
+              error={error}
+            />
+            <Button onClick={handleImportNext} disabled={!keyInput.trim()} variant="secondary">
+              {t('onboarding.addKey')}
+            </Button>
+            {importedKeys.length > 0 && (
+              <div style={{ fontSize: 'var(--ow-font-size-sm)', color: 'var(--ow-text-secondary)' }}>
+                {t('onboarding.keysStaged', { count: importedKeys.length })}
+                <div style={{ marginTop: 'var(--ow-space-1)' }}>
+                  {importedKeys.map((k, i) => (
+                    <div key={k.privateKey} style={{ fontFamily: 'var(--ow-font-mono)' }}>
+                      {k.family} · {k.privateKey.slice(0, 6)}…{k.privateKey.slice(-4)}
+                      <button
+                        type="button"
+                        aria-label={`remove key ${i}`}
+                        onClick={() => setImportedKeys(prev => prev.filter(x => x !== k))}
+                        style={{ marginLeft: 8, background: 'none', border: 'none', color: 'var(--ow-error)', cursor: 'pointer' }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <Button onClick={handleKeysDone} disabled={importedKeys.length === 0}>
+              {t('common.next')}
+            </Button>
+          </>
+        )}
         <Button variant="ghost" onClick={() => go('choice')}>← {t('common.back')}</Button>
       </div>
     );

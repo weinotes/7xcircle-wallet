@@ -18,11 +18,12 @@
  */
 
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Trash2, ChevronDown, Check } from 'lucide-react';
+import { ArrowLeft, Trash2, ChevronDown, Check, Usb } from 'lucide-react';
 import { Button, Modal } from '@open-wallet/ui';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useWalletStore } from '../store/wallet.js';
+import { SecretKeys } from './SecretKeys.js';
 import { LANGUAGES } from '@open-wallet/shared';
 import type { AppLanguage } from '@open-wallet/shared';
 
@@ -219,6 +220,28 @@ export function Settings() {
         <span>{t('settings.about')}</span>
         <span style={{ color: 'var(--ow-text-tertiary)', fontSize: 'var(--ow-font-size-sm)' }}>v0.1.0 · Apache-2.0</span>
       </div>
+
+      {/* address / public key export + password-gated phrase & private-key reveals */}
+      <SecretKeys />
+
+      {/* ── Hardware wallet (WebUSB — desktop Chrome / extension popup) ── */}
+      <button
+        type="button"
+        onClick={() => navigate('/ledger')}
+        style={{
+          ...rowStyle,
+          width: '100%',
+          cursor: 'pointer',
+          color: 'var(--ow-text-primary)',
+          fontFamily: 'inherit',
+          fontSize: 'var(--ow-font-size-sm)',
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--ow-space-2)' }}>
+          <Usb size={16} /> {t('settings.hardwareWallet')}
+        </span>
+        <span style={{ color: 'var(--ow-text-tertiary)' }}>Ledger · OneKey →</span>
+      </button>
 
       <div style={{ borderTop: '1px solid var(--ow-border)', paddingTop: 'var(--ow-space-4)' }}>
         <Button variant="danger" onClick={() => setShowResetConfirm(true)} style={{ width: '100%' }}>

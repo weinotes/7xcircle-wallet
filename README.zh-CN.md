@@ -10,7 +10,7 @@
 
 ## 功能特性
 
-- HD 钱包创建 / 导入（BIP39 助记词；单私钥导入在规划中）
+- HD 钱包创建 / 导入：支持 12 / 24 词 BIP39 助记词，并支持单私钥导入（EVM hex / Solana base58 / 波场 hex 或 WIF）；助记词、公钥与私钥均可在重新验证密码后导出
 - 跨钱包账户兼容：同一助记词与 MetaMask / TokenPocket / Phantom / TronLink 派生出完全相同的地址（由互操作测试锁定）
 - 多链统一资产管理：Ethereum、BNB Chain、Polygon、Arbitrum、Optimism、Base、Avalanche、Solana、TRON
 - 原生代币 + ERC20/BEP20/SPL/TRC20 代币余额与转账
@@ -92,8 +92,8 @@ Ethereum 优先排列），展示各链适配器发现的代币余额，原生�
 ## 路线图
 
 - Phase 1（当前）：MVP — 多链收发、加密保险库、Web 应用
-- Phase 2：移动端（React Native）与桌面端（Tauri）、硬件钱包（Ledger）、NFT 视图、更多链（Bitcoin 及 PSBT 支持）
-- Phase 3：DeFi — DApp 浏览器、Swap 聚合、质押、WalletConnect v2、单私钥导入（EVM hex / Solana base58）
+- Phase 2：移动端（React Native）与桌面端（Tauri）、NFT 视图、更多链（Bitcoin 及 PSBT 支持）；硬件钱包——Ledger / OneKey（Ledger 兼容模式）已通过 WebUSB 接入 Web 与插件端的 EVM 链（待真机验收）
+- Phase 3：DeFi — DApp 浏览器、Swap 聚合、质押、WalletConnect v2
 
 ## 许可证
 

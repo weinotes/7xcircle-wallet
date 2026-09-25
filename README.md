@@ -10,7 +10,7 @@
 
 ## Features
 
-- HD wallet creation & import (BIP39 mnemonic; single private-key import planned)
+- HD wallet creation & import: 12- or 24-word BIP39 mnemonic, plus single private-key import (EVM hex / Solana base58 / Tron hex or WIF) with password-gated export of phrase, public key and private keys
 - Cross-wallet compatible accounts: the same mnemonic yields the same addresses as MetaMask / TokenPocket / Phantom / TronLink (locked in by interop tests)
 - Multi-chain unified asset view: Ethereum, BNB Chain, Polygon, Arbitrum, Optimism, Base, Avalanche, Solana, TRON
 - Native + ERC20/BEP20/SPL/TRC20 token balances and transfers
@@ -95,8 +95,8 @@ See `TECH_DESIGN.md` for the full technical design and security audit checklist.
 ## Roadmap
 
 - Phase 1 (current): MVP — multi-chain send/receive, encrypted vault, web app
-- Phase 2: Mobile (React Native) & Desktop (Tauri), hardware wallet (Ledger), NFT view, more chains (Bitcoin with PSBT)
-- Phase 3: DeFi — DApp browser, swap aggregation, staking, WalletConnect v2, private-key import (EVM hex / Solana base58)
+- Phase 2: Mobile (React Native) & Desktop (Tauri), NFT view, more chains (Bitcoin with PSBT); hardware wallets — Ledger / OneKey (Ledger-compatible) connect over WebUSB on web & extension for EVM chains (device verification pending)
+- Phase 3: DeFi — DApp browser, swap aggregation, staking, WalletConnect v2
 
 ## License
 

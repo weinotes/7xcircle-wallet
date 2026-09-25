@@ -11,4 +11,8 @@ allowBuilds:
   bigint-buffer: false
   bufferutil: true
   esbuild: true
+  # keccak: optional native addon; the bundled pure-JS fallback is what
+  # our browser/RN/extension targets use — same policy as bigint-buffer above.
+  keccak: false
   utf-8-validate: true
+

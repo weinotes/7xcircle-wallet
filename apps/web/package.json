@@ -11,6 +11,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@ledgerhq/hw-app-eth": "^6.42.0",
+    "@ledgerhq/hw-transport-webusb": "^6.35.0",
     "@open-wallet/chains": "workspace:*",
     "@open-wallet/core": "workspace:*",
     "@open-wallet/shared": "workspace:*",
@@ -24,6 +26,7 @@
     "react-dom": "^19.0.0",
     "react-i18next": "^17.0.12",
     "react-router-dom": "^7.0.0",
+    "viem": "^2.56.0",
     "zustand": "^5.0.0"
   },
   "devDependencies": {

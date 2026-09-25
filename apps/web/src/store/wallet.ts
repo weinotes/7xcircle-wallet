@@ -49,6 +49,10 @@ interface WalletState {
   // ─── Accounts (public chain addresses, NOT persisted — re-derived on unlock) ──
   accounts: Account[];
 
+  // ─── Hardware wallet accounts (PERSISTED — public info only: address,
+  //     pubkey, device path. No key material ever exists for these.) ──
+  hwAccounts: Account[];
+
   // ─── Local pending transactions (NOT persisted — RAM only, refresh → gone) ──
   // Populated after Send broadcasts so Home/History can show them instantly
   // before the explorer API picks them up (10-30s delay typical).
@@ -70,6 +74,10 @@ interface WalletState {
 
   setActiveAccount: (id: string) => void;
 
+  /** Register a Ledger/device account (public data — survives locks) */
+  addHardwareAccount: (account: Account) => void;
+  removeHardwareAccount: (id: string) => void;
+
   setTheme: (t: 'dark' | 'light') => void;
   setLanguage: (l: AppLanguage) => void;
   setActiveChain: (chainId: string) => void;
@@ -90,6 +98,7 @@ export const useWalletStore = create<WalletState>()(
 
       unlocked: false,
       accounts: [],
+      hwAccounts: [],
 
       pendingTxs: {},
 
@@ -110,6 +119,7 @@ export const useWalletStore = create<WalletState>()(
           encryptedVault: null,
           unlocked: false,
           accounts: [],
+          hwAccounts: [],
           activeAccountId: null,
           pendingTxs: {},
         });
@@ -121,7 +131,9 @@ export const useWalletStore = create<WalletState>()(
         if (!state.encryptedVault) {
           throw new Error('No vault found — wallet not initialized');
         }
-        const accounts = await sessionUnlock(state.encryptedVault, password, chainConfigs);
+        const derived = await sessionUnlock(state.encryptedVault, password, chainConfigs);
+        // device accounts join every session — signing routes to the hardware
+        const accounts = [...derived, ...state.hwAccounts];
         set({
           unlocked: true,
           accounts,
@@ -137,6 +149,19 @@ export const useWalletStore = create<WalletState>()(
 
       // ── UI ──
       setActiveAccount: (id) => set({ activeAccountId: id }),
+      addHardwareAccount: (account) => set(state => {
+        if (state.hwAccounts.some(a => a.id === account.id)) return state;
+        const merged = [...state.hwAccounts, account];
+        return {
+          hwAccounts: merged,
+          accounts: state.unlocked ? [...state.accounts, account] : state.accounts,
+        };
+      }),
+      removeHardwareAccount: (id) => set(state => ({
+        hwAccounts: state.hwAccounts.filter(a => a.id !== id),
+        accounts: state.accounts.filter(a => a.id !== id),
+        activeAccountId: state.activeAccountId === id ? null : state.activeAccountId,
+      })),
       setTheme: (t) => set({ theme: t }),
       setLanguage: (l) => set({ language: l }),
       setActiveChain: (chainId) => set({ activeChainId: chainId }),
@@ -172,6 +197,9 @@ export const useWalletStore = create<WalletState>()(
         theme: state.theme,
         language: state.language,
         activeChainId: state.activeChainId,
+        // device accounts are public key + path — safe and must survive locks,
+        // unlike HD accounts they are not re-derived from the mnemonic
+        hwAccounts: state.hwAccounts,
         // NOTE: accounts, unlocked, activeAccountId intentionally excluded
         // — they are re-derived from the mnemonic on each unlock
       }),

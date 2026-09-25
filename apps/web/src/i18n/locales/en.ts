@@ -52,6 +52,21 @@ export default {
     createWallet: 'Create Wallet',
     importWallet: 'Import Wallet',
     invalidMnemonic: 'Invalid mnemonic phrase. Please check all words.',
+    wordCountOption: '{{count}} words',
+    importTab: {
+      phrase: 'Recovery phrase',
+      key: 'Private key',
+    },
+    keyFamily: {
+      evm: 'EVM (MetaMask)',
+      solana: 'Solana (Phantom)',
+      tron: 'TRON (TronLink)',
+    },
+    keyLabel: 'Private key',
+    keyPlaceholder: '0x-hex / base58 / WIF — pasted from your other wallet',
+    addKey: 'Add key',
+    keysStaged: 'Staged keys: {{count}}',
+    noKeysStaged: 'Add at least one private key first',
     incorrectVerify: 'Incorrect selection — please double-check your recovery phrase',
     passwordsDoNotMatch: 'Passwords do not match',
     passwordTooWeak: 'Password too weak',
@@ -216,6 +231,39 @@ export default {
     notEnoughBalance: 'Not enough {{symbol}} balance',
   },
 
+  // ── Hardware wallet ──
+  ledger: {
+    title: 'Connect hardware wallet',
+    unsupportedBrowser: 'WebUSB is not available here — use the extension popup or desktop Chrome/Edge.',
+    evmOnly: 'Hardware signing currently covers EVM chains only.',
+    unlockFirst: 'Unlock the wallet first, then come back to add device accounts.',
+    scanHint: 'Plug in the device, unlock it and open the Ethereum app. OneKey devices work in Ledger-compatible mode.',
+    connect: 'Search & connect',
+    scanning: 'Searching for device…',
+    selectAccounts: 'Accounts on the device — tick the ones to add:',
+    accountN: 'Device account {{n}}',
+    verifyOnDevice: 'Each added address is shown on the device screen for verification.',
+    addSelected: 'Add selected accounts',
+  },
+
+  // ── Keys & recovery ──
+  keys: {
+    title: 'Keys & Recovery',
+    address: 'Address',
+    publicKey: 'Public key',
+    sourceKey: 'imported key',
+    sourceLedger: 'hardware wallet',
+    copy: 'Copy',
+    copied: 'Copied',
+    passwordLabel: 'Password',
+    passwordPlaceholder: 'Re-enter your password',
+    revealPhrase: 'Reveal phrase',
+    exportKey: 'Export private key',
+    hide: 'Hide',
+    revealWarning: 'Anyone with this can steal every asset — never share or screenshot it.',
+    notReady: 'Wallet not ready — unlock with an active account first',
+  },
+
   // ── dApp approvals ──
   dapp: {
     title: 'dApp requests',
@@ -242,6 +290,7 @@ export default {
     arabic: 'العربية',
     about: 'About',
     resetWallet: 'Reset Wallet',
+    hardwareWallet: 'Hardware wallet',
     resetWarning: 'This erases all data. Ensure you have your recovery phrase backed up.',
     resetConfirmTitle: 'Reset Wallet?',
     resetConfirmDesc: "This will delete your encrypted vault from this device. You'll need your recovery phrase to restore.",

@@ -17,7 +17,8 @@
  * SessionManager — in-memory wallet session lifecycle.
  *
  * Responsibilities:
- *   - Decrypt vault with user password → recover mnemonic
+ *   - Decrypt vault with user password → recover the secret envelope
+ *     (HD mnemonic OR imported raw private keys)
  *   - HD-derive accounts across all supported chains
  *   - Provide private keys on demand (for signing)
  *   - Lock → erase all sensitive data from memory
@@ -35,14 +36,25 @@ import {
   evmPublicKey,
   solanaPublicKey,
 } from '../index.js';
+import { decodeVaultSecret, type VaultKeyEntry } from '../vault/secret.js';
+import { parsePrivateKey } from '../keys/keyImport.js';
 import { chainRegistry } from '../chain/registry.js';
 import type { Account, VaultData, ChainConfig } from '@open-wallet/shared';
-import { generateId, wipeBytes } from '@open-wallet/shared';
+import { generateId, toHex, wipeBytes } from '@open-wallet/shared';
+
+/** A parsed key held in RAM for key-imported sessions */
+interface LiveKey {
+  family: VaultKeyEntry['family'];
+  privateKey: Uint8Array;
+  nickname?: string;
+}
 
 export interface SessionState {
   unlocked: boolean;
   /** Mnemonic stored as UTF-8 bytes so we can wipe it from memory on lock */
   mnemonicBytes: Uint8Array | null;
+  /** Raw imported keys (private-key wallets); wiped on lock just like phrases */
+  keyEntries: LiveKey[] | null;
   accounts: Account[];
   unlockedAt: number | null;          // unix ms
   lastActivityAt: number | null;      // for auto-lock
@@ -53,6 +65,7 @@ export interface SessionState {
 let state: SessionState = {
   unlocked: false,
   mnemonicBytes: null,
+  keyEntries: null,
   accounts: [],
   unlockedAt: null,
   lastActivityAt: null,
@@ -146,46 +159,109 @@ function deriveAllAccounts(
   return accounts;
 }
 
+/** Which key-family a chain config is served by (imported-key lookup) */
+function familyForConfigType(type: ChainConfig['type']): VaultKeyEntry['family'] | null {
+  if (type === 'evm' || type === 'tron' || type === 'solana') return type;
+  return null;
+}
+
+/**
+ * Build accounts for a private-key-imported vault: every registered chain
+ * gets the account its imported family key controls. Multiple keys per
+ * family create multiple accounts per chain (MetaMask-style multi-import).
+ */
+function deriveAccountsFromKeys(
+  entries: VaultKeyEntry[],
+  chainConfigs: ChainConfig[],
+): { accounts: Account[]; live: LiveKey[] } {
+  const live: LiveKey[] = entries.map(e => {
+    const parsed = parsePrivateKey(e.family, e.privateKey);
+    return { family: e.family, privateKey: parsed.privateKey, nickname: e.nickname };
+  });
+
+  const accounts: Account[] = [];
+  for (const config of chainConfigs) {
+    const adapter = chainRegistry.get(config.chainId);
+    const family = familyForConfigType(config.type);
+    if (!adapter || !family) continue;
+
+    live.forEach((key, idx) => {
+      if (key.family !== family) return;
+      const publicKey = family === 'solana'
+        ? solanaPublicKey(key.privateKey)
+        : evmPublicKey(key.privateKey);
+      accounts.push({
+        id: generateId(),
+        chainId: config.chainId,
+        address: adapter.deriveAddress(publicKey, idx),
+        publicKey: toHex(publicKey),
+        derivationPath: 'imported',
+        accountIndex: idx,
+        nickname: key.nickname ?? `${config.name} (imported)`,
+        createdAt: Date.now(),
+        source: 'key',
+      });
+    });
+  }
+  return { accounts, live };
+}
+
 // ─── Lifecycle ───────────────────────────────────────────────────────
 
 /**
- * Unlock the wallet: decrypt vault → derive accounts → hold in memory.
+ * Unlock the wallet: decrypt vault → parse secret envelope → build accounts
+ * → hold secrets in memory. Works for BOTH vault shapes (HD mnemonic and
+ * imported private keys) plus legacy bare-mnemonic plaintexts.
  * Throws on wrong password or corrupted vault.
- *
- * Stores mnemonic as UTF-8 bytes (not a JS string) so we can wipe it from
- * memory on lock().
  */
 export async function unlock(
   vault: VaultData,
   password: string,
   chainConfigs: ChainConfig[],
 ): Promise<Account[]> {
-  const mnemonic = await decryptVault(vault, password);
-  const accounts = deriveAllAccounts(mnemonic, chainConfigs);
+  const plaintext = await decryptVault(vault, password);
+  const secret = decodeVaultSecret(plaintext);
 
-  const bytes = mnemonicToBytes(mnemonic);
+  if (secret.kind === 'mnemonic') {
+    const accounts = deriveAllAccounts(secret.mnemonic, chainConfigs);
+    const bytes = mnemonicToBytes(secret.mnemonic);
+    state = {
+      unlocked: true,
+      mnemonicBytes: bytes,
+      keyEntries: null,
+      accounts,
+      unlockedAt: Date.now(),
+      lastActivityAt: Date.now(),
+    };
+    return accounts;
+  }
 
+  const { accounts, live } = deriveAccountsFromKeys(secret.keys, chainConfigs);
   state = {
     unlocked: true,
-    mnemonicBytes: bytes,
+    mnemonicBytes: null,
+    keyEntries: live,
     accounts,
     unlockedAt: Date.now(),
     lastActivityAt: Date.now(),
   };
-
   return accounts;
 }
 
 /**
  * Lock the wallet — erase ALL sensitive data from memory.
  *
- * Wipes the mnemonic byte buffer before nulling it out, so the raw
- * passphrase bytes are not left in RAM waiting for GC.
+ * Wipes the mnemonic byte buffer AND every live key buffer before nulling
+ * them out, so raw secrets are not left in RAM waiting for GC.
  */
 export function lock(): void {
   if (state.mnemonicBytes) {
     wipeBytes(state.mnemonicBytes);
     state.mnemonicBytes = null;
+  }
+  if (state.keyEntries) {
+    for (const k of state.keyEntries) wipeBytes(k.privateKey);
+    state.keyEntries = null;
   }
   state.unlocked = false;
   state.accounts = [];
@@ -202,17 +278,32 @@ export function lock(): void {
  * Throws if session is locked or account is not found.
  */
 export function getPrivateKey(account: Account): Uint8Array {
-  if (!state.unlocked || !state.mnemonicBytes) {
+  if (!state.unlocked) {
     throw new Error('Wallet is locked');
   }
 
-  const mnemonic = mnemonicFromBytes(state.mnemonicBytes);
   const config = chainRegistry.get(account.chainId)?.config;
   if (!config) {
     throw new Error(`No chain config for ${account.chainId}`);
   }
 
   touchActivity();
+
+  // Imported-key session: hand out a COPY of the stored key (caller wipes)
+  if (state.keyEntries) {
+    const family = familyForConfigType(config.type);
+    const matches = state.keyEntries.filter(k => k.family === family);
+    const key = matches[account.source === 'key' ? account.accountIndex : 0];
+    if (!key) {
+      throw new Error(`No imported key for ${account.chainId}`);
+    }
+    return key.privateKey.slice();
+  }
+
+  if (!state.mnemonicBytes) {
+    throw new Error('Wallet is locked');
+  }
+  const mnemonic = mnemonicFromBytes(state.mnemonicBytes);
 
   if (config.type === 'evm' || config.type === 'tron') {
     return deriveEvmPrivateKey(mnemonic, account.derivationPath);
@@ -221,4 +312,61 @@ export function getPrivateKey(account: Account): Uint8Array {
   }
 
   throw new Error(`Unsupported chain type: ${config.type}`);
+}
+
+// ─── Export helpers (password-gated reveals) ───────────────────
+
+/**
+ * Reveal the recovery phrase. Requires the password AGAIN — an unlocked
+ * session alone is not enough (shoulder-surfing / XSS while unlocked).
+ * Throws for private-key-imported wallets: they have no phrase to show.
+ */
+export async function revealRecoveryPhrase(
+  vault: VaultData,
+  password: string,
+): Promise<string> {
+  const secret = decodeVaultSecret(await decryptVault(vault, password));
+  if (secret.kind !== 'mnemonic') {
+    throw new Error('This wallet was imported from private keys — it has no recovery phrase');
+  }
+  return secret.mnemonic;
+}
+
+/**
+ * Export one account's private key in its canonical wallet format
+ * (0x-hex for EVM/TRON, base58 64-byte secret for Solana).
+ * Password re-verification like phrase reveal.
+ */
+export async function exportAccountPrivateKey(
+  account: Account,
+  vault: VaultData,
+  password: string,
+): Promise<string> {
+  const config = chainRegistry.get(account.chainId)?.config;
+  if (!config) {
+    throw new Error(`No chain config for ${account.chainId}`);
+  }
+  const secret = decodeVaultSecret(await decryptVault(vault, password));
+
+  let bytes: Uint8Array;
+  if (secret.kind === 'keys') {
+    const family = familyForConfigType(config.type);
+    const matches = secret.keys.filter(k => k.family === family);
+    const entry = matches[account.source === 'key' ? account.accountIndex : 0] ?? matches[0];
+    if (!entry) {
+      throw new Error(`No imported key covers ${account.chainId}`);
+    }
+    bytes = parsePrivateKey(entry.family, entry.privateKey).privateKey;
+  } else {
+    bytes = config.type === 'solana'
+      ? deriveSolanaPrivateKey(secret.mnemonic, account.derivationPath)
+      : deriveEvmPrivateKey(secret.mnemonic, account.derivationPath);
+  }
+
+  if (config.type === 'solana') {
+    // Solana wallets (Phantom/Solflare) export the base58 64-byte secret
+    const { base58Encode } = await import('../keys/keyImport.js');
+    return base58Encode(bytes);
+  }
+  return '0x' + toHex(bytes);
 }

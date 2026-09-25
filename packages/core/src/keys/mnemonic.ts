@@ -17,7 +17,7 @@
  * Key management: mnemonic generation, validation, and HD derivation.
  *
  * Supports:
- *   - BIP-39 mnemonic (24 words, 256-bit entropy)
+ *   - BIP-39 mnemonic (12 or 24 words — 128/256-bit entropy)
  *   - BIP-32 / SLIP-0010 HD key derivation
  *   - secp256k1 (EVM) via @scure/bip32 HDKey
  *   - ed25519 (Solana) via SLIP-0010 HMAC-SHA512 (handwritten here)
@@ -32,9 +32,17 @@ import { hmac } from '@noble/hashes/hmac';
 import { sha512 } from '@noble/hashes/sha512';
 import { toHex, fromHex, wipeBytes } from '@open-wallet/shared';
 
-/** Generate a new 24-word mnemonic using CSPRNG */
-export function createMnemonic(): string {
-  return generateMnemonic(256);
+/**
+ * Generate a mnemonic using CSPRNG.
+ * 12 words = 128-bit entropy, 24 words = 256-bit entropy — both are the
+ * BIP-39 standard every mainstream wallet (MetaMask/TP/Phantom/TronLink)
+ * imports and exports, so either length round-trips everywhere.
+ */
+export function createMnemonic(wordCount: 12 | 24 = 24): string {
+  if (wordCount !== 12 && wordCount !== 24) {
+    throw new Error(`unsupported mnemonic length: ${String(wordCount)}`);
+  }
+  return generateMnemonic(wordCount === 12 ? 128 : 256);
 }
 
 /** Validate a mnemonic phrase (checks word count + checksum) */

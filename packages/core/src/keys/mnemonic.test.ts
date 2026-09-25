@@ -27,7 +27,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { HDKey } from '@scure/bip32';
-import { deriveSlip0010Ed25519FromSeed, mnemonicToSeed } from './mnemonic.js';
+import { createMnemonic, deriveSlip0010Ed25519FromSeed, isValidMnemonic, mnemonicToSeed } from './mnemonic.js';
 
 const bytesToHex = (b: Uint8Array): string => Array.from(b).map(x => x.toString(16).padStart(2, '0')).join('');
 const hexToBytes = (h: string): Uint8Array => {
@@ -105,6 +105,37 @@ describe('BIP39 mnemonic — seed (official vectors, trezor/python-mnemonic vect
   });
   it("derives empty-passphrase seed (canonical 5eb00bbd...)", () => {
     expect(bytesToHex(mnemonicToSeed('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'))).toBe('5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4');
+  });
+});
+
+describe('createMnemonic — 12 / 24 word generation', () => {
+  it('defaults to 24 words and validates', () => {
+    const m = createMnemonic();
+    expect(m.split(' ')).toHaveLength(24);
+    expect(isValidMnemonic(m)).toBe(true);
+  });
+
+  it('generates valid 12-word phrases (128-bit entropy)', () => {
+    for (let i = 0; i < 5; i++) {
+      const m = createMnemonic(12);
+      expect(m.split(' ')).toHaveLength(12);
+      expect(isValidMnemonic(m)).toBe(true);
+    }
+  });
+
+  it('every generated phrase carries a valid checksum (isValidMnemonic is strict)', () => {
+    // flipping one word must break the checksum the overwhelming majority
+    // of the time — instead assert the deterministic path: known-bad phrases
+    expect(isValidMnemonic('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon')).toBe(false); // bad checksum
+    expect(isValidMnemonic('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about')).toBe(true);
+  });
+
+  it('rejects unsupported lengths', () => {
+    expect(() => createMnemonic(15 as 12)).toThrow(/unsupported/);
+  });
+
+  it('generates distinct entropy per call', () => {
+    expect(createMnemonic(12)).not.toBe(createMnemonic(12));
   });
 });
 

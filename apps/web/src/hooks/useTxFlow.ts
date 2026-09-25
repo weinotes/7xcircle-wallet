@@ -27,7 +27,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getPrivateKey, isUnlocked, touchActivity } from '@open-wallet/core';
+import { isUnlocked, touchActivity } from '@open-wallet/core';
+import { signForAccount } from '../hw/signFor.js';
 import type { ChainAdapter } from '@open-wallet/core';
 import type {
   Account,
@@ -174,8 +175,6 @@ export function useTxFlow({
     let previousHash: string | null = null;
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      let privateKey: Uint8Array | null = null;
-
       try {
         // ── Build ──────────────────────────────────────────────────────
         setStatus('building');
@@ -199,10 +198,10 @@ export function useTxFlow({
         }
 
         // ── Sign ───────────────────────────────────────────────────────
+        // dispatcher: software key (wiped internally) or the Ledger device
         setStatus('signing');
         touchActivity();
-        privateKey = getPrivateKey(account);
-        const signed = await adapter.signTransaction(unsigned, privateKey);
+        const signed = await signForAccount(account, unsigned, adapter);
 
         // ── Broadcast ──────────────────────────────────────────────────
         setStatus('broadcasting');
@@ -259,10 +258,9 @@ export function useTxFlow({
         setError(e instanceof Error ? e.message : 'Transaction failed');
         setStatus('failed');
         return;
-      } finally {
-        // The key lives for exactly one attempt — never across a retry
-        if (privateKey) privateKey.fill(0);
       }
+      // key hygiene lives inside signForAccount — a software key never
+      // survives past one signing call, let alone across a retry
     }
   }, [adapter, account, chainId, feeTier, addPendingTx, removePendingTx]);
 

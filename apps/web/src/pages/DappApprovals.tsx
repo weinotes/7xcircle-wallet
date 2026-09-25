@@ -39,6 +39,8 @@ import {
   touchActivity,
 } from '@open-wallet/core';
 import { useWalletStore } from '../store/wallet.js';
+import { signForAccount } from '../hw/signFor.js';
+import { ledgerPathOf, ledgerSignMessage, openEthApp } from '../hw/ledger.js';
 import { CHAIN_CONFIGS } from '@open-wallet/chains';
 import type { SitePermission } from '@open-wallet/core';
 
@@ -126,6 +128,21 @@ export function DappApprovals() {
       if (req.method === 'personal_sign') {
         const message = String(req.params?.[0] ?? '');
         touchActivity();
+        if (account.source === 'ledger') {
+          // device signs — same 0x-hex payload convention as the software path
+          const messageHex = message.startsWith('0x')
+            ? message
+            : '0x' + Array.from(new TextEncoder().encode(message))
+                .map(b => b.toString(16).padStart(2, '0')).join('');
+          const { eth, close } = await openEthApp();
+          try {
+            const sig = await ledgerSignMessage(eth, ledgerPathOf(account), messageHex);
+            resolve(req.id, true, sig);
+          } finally {
+            await close().catch(() => undefined);
+          }
+          return;
+        }
         const pk = getPrivateKey(account);
         try {
           const sig = signPersonalMessage(message, pk);
@@ -148,14 +165,10 @@ export function DappApprovals() {
           : { kind: 'native-transfer' as const, to: tx.to, amountRaw: tx.value ? BigInt(tx.value).toString() : '0' };
         const built = await adapter.buildTransaction(intent, { from: account.address, feeTier: 'normal' });
         touchActivity();
-        const pk = getPrivateKey(account);
-        try {
-          const signed = await adapter.signTransaction(built, pk);
-          const hash = await adapter.sendTransaction(signed);
-          resolve(req.id, true, hash);
-        } finally {
-          pk.fill(0);
-        }
+        // dispatcher handles software keys AND routes ledger accounts to the device
+        const signed = await signForAccount(account, built, adapter);
+        const hash = await adapter.sendTransaction(signed);
+        resolve(req.id, true, hash);
         return;
       }
 

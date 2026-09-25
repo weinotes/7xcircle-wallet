@@ -40,6 +40,7 @@ import { chainRegistry } from '@open-wallet/core';
 import {
   createMnemonic,
   decryptVault,
+  encodeVaultSecret,
   encryptVault,
   evaluatePassword,
   isValidMnemonic,
@@ -125,7 +126,7 @@ export default function App() {
     setBusy(true);
     setError('');
     try {
-      const nextVault = await encryptVault(mnemonic, password);
+      const nextVault = await encryptVault(encodeVaultSecret({ kind: 'mnemonic', mnemonic }), password);
       await SecureStore.setItemAsync(VAULT_KEY, JSON.stringify(nextVault));
       if (bioEnabled) {
         await savePasswordForBiometrics(password).catch(() => undefined);

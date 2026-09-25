@@ -34,10 +34,17 @@ export interface Account {
   chainId: string;          // e.g. "bsc-56", "eth-1", "solana"
   address: string;          // native address format per chain
   publicKey: string;        // hex or base58 encoded
-  derivationPath: string;   // e.g. "m/44'/60'/0'/0/0"
+  derivationPath: string;   // e.g. "m/44'/60'/0'/0/0"; "imported" / "ledger" for non-HD
   accountIndex: number;     // index within the derivation path
   nickname?: string;
   createdAt: number;        // unix timestamp
+  /**
+   * Where the signing capability lives:
+   *   hd     — derived from the vault mnemonic (default, older records omit it)
+   *   key    — raw private key imported into the vault
+   *   ledger — keys never leave the device; signing routes to the hardware
+   */
+  source?: 'hd' | 'key' | 'ledger';
 }
 
 /** Unified token model */

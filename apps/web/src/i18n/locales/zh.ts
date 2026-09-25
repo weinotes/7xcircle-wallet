@@ -52,6 +52,21 @@ export default {
     createWallet: '创建钱包',
     importWallet: '导入钱包',
     invalidMnemonic: '助记词无效，请检查所有单词。',
+    wordCountOption: '{{count}} 个词',
+    importTab: {
+      phrase: '助记词',
+      key: '私钥',
+    },
+    keyFamily: {
+      evm: 'EVM（MetaMask）',
+      solana: 'Solana（Phantom）',
+      tron: '波场（TronLink）',
+    },
+    keyLabel: '私钥',
+    keyPlaceholder: '从其他钱包导出的 0x-hex / base58 / WIF 私钥',
+    addKey: '添加私钥',
+    keysStaged: '已暂存私钥：{{count}}',
+    noKeysStaged: '请先至少添加一个私钥',
     incorrectVerify: '选择有误——请再次核对您的助记词',
     passwordsDoNotMatch: '两次输入的密码不一致',
     passwordTooWeak: '密码强度不足',
@@ -216,6 +231,39 @@ export default {
     notEnoughBalance: '{{symbol}} 余额不足',
   },
 
+  // ── 硬件钱包 ──
+  ledger: {
+    title: '连接硬件钱包',
+    unsupportedBrowser: '当前环境不支持 WebUSB——请使用浏览器扩展弹窗或桌面版 Chrome/Edge。',
+    evmOnly: '硬件签名目前仅覆盖 EVM 链。',
+    unlockFirst: '请先解锁钱包，再回来添加设备账户。',
+    scanHint: '插上设备并解锁，打开以太坊应用；OneKey 设备可使用 Ledger 兼容模式。',
+    connect: '搜索并连接',
+    scanning: '正在搜索设备…',
+    selectAccounts: '设备上的账户——勾选要添加的：',
+    accountN: '设备账户 {{n}}',
+    verifyOnDevice: '每个添加的地址都会在设备屏幕上显示供核对。',
+    addSelected: '添加所选账户',
+  },
+
+  // ── 密钥与恢复 ──
+  keys: {
+    title: '密钥与恢复',
+    address: '地址',
+    publicKey: '公钥',
+    sourceKey: '导入私钥',
+    sourceLedger: '硬件钱包',
+    copy: '复制',
+    copied: '已复制',
+    passwordLabel: '密码',
+    passwordPlaceholder: '重新输入密码',
+    revealPhrase: '显示助记词',
+    exportKey: '导出私钥',
+    hide: '隐藏',
+    revealWarning: '拿到它的人可以转走全部资产——切勿分享或截屏。',
+    notReady: '钱包未就绪——请先解锁并选择有效账户',
+  },
+
   // ── DApp 审批 ──
   dapp: {
     title: 'DApp 请求',
@@ -242,6 +290,7 @@ export default {
     arabic: 'العربية',
     about: '关于',
     resetWallet: '重置钱包',
+    hardwareWallet: '硬件钱包',
     resetWarning: '这将删除所有数据。请确保您已备份助记词。',
     resetConfirmTitle: '重置钱包？',
     resetConfirmDesc: '这将从本设备删除加密的钱包数据。您需要助记词来恢复。',

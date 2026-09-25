@@ -36,6 +36,7 @@ import { Receive } from '@web/pages/Receive.js';
 import { History } from '@web/pages/History.js';
 import { Settings } from '@web/pages/Settings.js';
 import { DappApprovals } from '@web/pages/DappApprovals.js';
+import { LedgerConnect } from '@web/pages/LedgerConnect.js';
 import { useWalletStore } from '@web/store/wallet.js';
 import { registerAllChains } from '@open-wallet/chains';
 import { touchActivity } from '@open-wallet/core';
@@ -108,6 +109,7 @@ function AppShell() {
       <Route path="/send" element={<Send />} />
       <Route path="/swap" element={<Swap />} />
       <Route path="/dapp" element={<DappApprovals />} />
+      <Route path="/ledger" element={<LedgerConnect />} />
       <Route path="/receive" element={<Receive />} />
       <Route path="/history" element={<History />} />
       <Route path="/settings" element={<Settings />} />
