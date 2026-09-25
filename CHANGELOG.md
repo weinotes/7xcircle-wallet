@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Address-poisoning guard: a recipient that shares the first 5 and last 4
+  characters with any address you have previously sent to on that chain —
+  without being identical — triggers a red alert on Send and again on the
+  confirmation review (pure detector in `@7xcircle/shared`, 9 unit tests).
+- Cross-chain portfolio on Home: the chain picker gains an “All chains”
+  view — total USD across every account, per-chain asset rows, lazy
+  first-touch loading (no RPC storm in the popup unless asked), partial
+  failure surfaced, drill-into-chain built in.
 - Token-approval ledger with revocation (Settings → Token approvals): every
   `approve(spender, amount)` this wallet broadcasts — from swap flows and
   from dApp `eth_sendTransaction` calldata — is recorded (persisted, public

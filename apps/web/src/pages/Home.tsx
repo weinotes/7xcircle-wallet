@@ -40,7 +40,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Lock, Send, ArrowLeftRight, TrendingUp, ArrowDownToLine, History as HistoryIcon, Settings, ArrowUpRight, ArrowDownLeft, Coins, RefreshCw, Plug, Copy, Check, ChevronDown } from 'lucide-react';
+import { Lock, Send, ArrowLeftRight, TrendingUp, ArrowDownToLine, History as HistoryIcon, Settings, ArrowUpRight, ArrowDownLeft, Coins, RefreshCw, Plug, Copy, Check, ChevronDown, LayoutGrid } from 'lucide-react';
 import { Button, IconButton, Card, ListRow, Skeleton, EmptyState } from '@7xcircle/ui';
 import { useWalletStore } from '../store/wallet.js';
 import { chainRegistry } from '@7xcircle/core';
@@ -48,6 +48,7 @@ import { CHAIN_CONFIGS, priceTokens, totalUsd } from '@7xcircle/chains';
 import { formatBalance, formatUsd } from '@7xcircle/shared';
 import type { TokenBalance } from '@7xcircle/shared';
 import { useTransactionHistory } from '../hooks/useTransactionHistory.js';
+import { usePortfolio } from '../hooks/usePortfolio.js';
 
 export function Home() {
   const navigate = useNavigate();
@@ -62,6 +63,11 @@ export function Home() {
   const [tokensError, setTokensError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [chainOpen, setChainOpen] = useState(false);
+  // "All chains" is a local VIEW — the store's activeChainId keeps pointing
+  // at a real chain so Send/Swap/recent-tx semantics never have to special
+  // case a pseudo-chain.
+  const [viewAll, setViewAll] = useState(false);
+  const portfolio = usePortfolio(viewAll);
   const chainRef = useRef<HTMLDivElement | null>(null);
 
   const activeChain = CHAIN_CONFIGS.find(c => c.chainId === activeChainId);
@@ -154,7 +160,7 @@ export function Home() {
         type="button"
         aria-haspopup="listbox"
         aria-expanded={chainOpen}
-        aria-label={t('home.chainSelector', { chain: activeChain?.name ?? '' })}
+        aria-label={t('home.chainSelector', { chain: viewAll ? t('portfolio.allChains') : (activeChain?.name ?? '') })}
         onClick={() => setChainOpen(o => !o)}
         style={{
           display: 'inline-flex',
@@ -171,8 +177,17 @@ export function Home() {
           fontFamily: 'inherit',
         }}
       >
-        {activeChain?.name ?? activeChainId}
-        {activeChain?.testnet && <span className="ow-faint" style={{ fontSize: 'var(--ow-font-size-xs)' }}>testnet</span>}
+        {viewAll ? (
+          <>
+            <LayoutGrid size={14} aria-hidden="true" style={{ color: 'var(--ow-accent)' }} />
+            {t('portfolio.allChains')}
+          </>
+        ) : (
+          <>
+            {activeChain?.name ?? activeChainId}
+            {activeChain?.testnet && <span className="ow-faint" style={{ fontSize: 'var(--ow-font-size-xs)' }}>testnet</span>}
+          </>
+        )}
         <ChevronDown
           size={14}
           aria-hidden="true"
@@ -201,8 +216,39 @@ export function Home() {
             boxShadow: 'var(--ow-shadow-lg)',
           }}
         >
+          <button
+            type="button"
+            role="option"
+            aria-selected={viewAll}
+            onClick={() => {
+              setViewAll(true);
+              setChainOpen(false);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 'var(--ow-space-2)',
+              width: '100%',
+              padding: '10px 12px',
+              backgroundColor: viewAll ? 'var(--ow-bg-hover)' : 'transparent',
+              border: 'none',
+              borderBottom: '1px solid var(--ow-border-subtle)',
+              cursor: 'pointer',
+              color: 'var(--ow-text-primary)',
+              fontFamily: 'inherit',
+              fontSize: 'var(--ow-font-size-sm)',
+              fontWeight: 600,
+              textAlign: 'start',
+            }}
+          >
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <LayoutGrid size={13} aria-hidden="true" /> {t('portfolio.allChains')}
+            </span>
+            {viewAll && <Check size={14} aria-hidden="true" style={{ color: 'var(--ow-accent)', flexShrink: 0 }} />}
+          </button>
           {CHAIN_CONFIGS.map(c => {
-            const selected = c.chainId === activeChainId;
+            const selected = !viewAll && c.chainId === activeChainId;
             return (
               <button
                 key={c.chainId}
@@ -210,6 +256,7 @@ export function Home() {
                 role="option"
                 aria-selected={selected}
                 onClick={() => {
+                  setViewAll(false);
                   setActiveChain(c.chainId);
                   setChainOpen(false);
                 }}
@@ -294,8 +341,12 @@ export function Home() {
           {chainSelector}
         </div>
         <div style={{ display: 'flex', gap: 'var(--ow-space-1)', alignItems: 'center' }}>
-          <IconButton aria-label={t('home.refresh')} onClick={() => void fetchTokens()} disabled={tokensLoading}>
-            <RefreshCw size={16} style={tokensLoading ? { animation: 'ow-spin 1s linear infinite' } : undefined} />
+          <IconButton
+            aria-label={t('home.refresh')}
+            onClick={() => void (viewAll ? portfolio.refresh() : fetchTokens())}
+            disabled={viewAll ? portfolio.loading : tokensLoading}
+          >
+            <RefreshCw size={16} style={(viewAll ? portfolio.loading : tokensLoading) ? { animation: 'ow-spin 1s linear infinite' } : undefined} />
           </IconButton>
           <IconButton aria-label={t('home.settingsAria')} onClick={() => navigate('/settings')}>
             <Settings size={16} />
@@ -307,6 +358,111 @@ export function Home() {
       </header>
 
       {/* ── Portfolio hero ──────────────────────────────────────────── */}
+      {/* ── Cross-chain portfolio (All chains view) ────────────────── */}
+      {viewAll && (
+        <Card centered style={{ padding: 'var(--ow-space-8)' }}>
+          <div className="ow-muted" style={{ fontSize: 'var(--ow-font-size-sm)' }}>
+            {t('portfolio.title')}
+          </div>
+          {portfolio.loading && !portfolio.loaded ? (
+            <>
+              <Skeleton width={220} height={36} style={{ marginTop: 'var(--ow-space-2)' }} />
+              <Skeleton width={140} height={12} style={{ marginTop: 'var(--ow-space-3)' }} />
+            </>
+          ) : (
+            <>
+              <div className="ow-mono" style={{ fontSize: 'var(--ow-font-size-3xl)', fontWeight: 700 }}>
+                {formatUsd(totalUsd(portfolio.tokens))}
+              </div>
+              <div className="ow-muted" style={{ fontSize: 'var(--ow-font-size-sm)', marginTop: 'var(--ow-space-1)' }}>
+                {t('portfolio.subtitle', { count: accounts.length })}
+              </div>
+              {portfolio.failedChains > 0 && (
+                <div role="status" style={{ color: 'var(--ow-warning)', fontSize: 'var(--ow-font-size-xs)', marginTop: 'var(--ow-space-2)' }}>
+                  {t('portfolio.partialFail', { count: portfolio.failedChains })}
+                </div>
+              )}
+            </>
+          )}
+        </Card>
+      )}
+      {viewAll && (
+        <Card>
+          <div className="ow-row-between" style={{ marginBottom: 'var(--ow-space-2)' }}>
+            <div className="ow-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Coins size={14} aria-hidden="true" /> {t('portfolio.assets', { count: portfolio.tokens.length })}
+            </div>
+          </div>
+          {portfolio.loading && !portfolio.loaded ? (
+            <>
+              <Skeleton height={44} style={{ marginBottom: 6 }} />
+              <Skeleton height={44} style={{ marginBottom: 6 }} />
+              <Skeleton height={44} />
+            </>
+          ) : portfolio.tokens.length === 0 ? (
+            <div className="ow-faint" style={{ padding: 'var(--ow-space-3) 0', fontSize: 'var(--ow-font-size-sm)', textAlign: 'center' }}>
+              {t('portfolio.empty')}
+            </div>
+          ) : (
+            portfolio.tokens.map(tok => (
+              <ListRow
+                key={`${tok.chainId}:${tok.address}`}
+                aria-label={`${tok.symbol} · ${CHAIN_CONFIGS.find(c => c.chainId === tok.chainId)?.name ?? tok.chainId}`}
+                onClick={() => {
+                  // Drill into the owning chain, then hand off to Send —
+                  // one coherent single-chain context for the money step.
+                  setViewAll(false);
+                  setActiveChain(tok.chainId);
+                  navigate('/send');
+                }}
+                start={
+                  <>
+                    <div
+                      aria-hidden="true"
+                      className="ow-mono"
+                      style={{
+                        width: 32,
+                        height: 32,
+                        flexShrink: 0,
+                        borderRadius: 'var(--ow-radius-full)',
+                        backgroundColor: 'var(--ow-bg-secondary)',
+                        border: '1px solid var(--ow-border)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 'var(--ow-font-size-xs)',
+                        fontWeight: 700,
+                        color: 'var(--ow-text-secondary)',
+                      }}
+                    >
+                      {tok.symbol.slice(0, 3).toUpperCase()}
+                    </div>
+                    <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                      <span style={{ fontSize: 'var(--ow-font-size-sm)', fontWeight: 600 }}>{tok.symbol}</span>
+                      <span className="ow-faint" style={{ fontSize: 'var(--ow-font-size-xs)' }}>
+                        {CHAIN_CONFIGS.find(c => c.chainId === tok.chainId)?.name ?? tok.chainId}
+                      </span>
+                    </span>
+                  </>
+                }
+                end={
+                  <>
+                    <span className="ow-mono" style={{ fontSize: 'var(--ow-font-size-sm)' }}>
+                      {formatBalance(tok.balance, tok.decimals, 4)}
+                    </span>
+                    <span className="ow-faint" style={{ fontSize: 'var(--ow-font-size-xs)' }}>
+                      {tok.balanceUsd !== undefined ? `≈ ${formatUsd(tok.balanceUsd)}` : ''}
+                    </span>
+                  </>
+                }
+              />
+            ))
+          )}
+        </Card>
+      )}
+
+      {/* ── Single-chain hero ──────────────────────────────────────── */}
+      {!viewAll && (
       <Card centered style={{ padding: 'var(--ow-space-8)' }}>
         {tokensLoading && tokens.length === 0 ? (
           <>
@@ -366,15 +522,16 @@ export function Home() {
           </>
         )}
       </Card>
+      )}
 
       {/* ── Asset list (native + ERC20s) ─────────────────────────────── */}
-      {tokensLoading && tokens.length > 1 && (
+      {!viewAll && tokensLoading && tokens.length > 1 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }} aria-hidden="true">
           <Skeleton height={40} />
           <Skeleton height={40} />
         </div>
       )}
-      {!tokensLoading && tokens.length > 1 && (
+      {!viewAll && !tokensLoading && tokens.length > 1 && (
         <Card>
           <div className="ow-row-between" style={{ marginBottom: 'var(--ow-space-2)' }}>
             <div className="ow-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
