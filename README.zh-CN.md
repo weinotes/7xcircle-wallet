@@ -15,6 +15,11 @@
 - 多链统一资产管理：Ethereum、BNB Chain、Polygon、Arbitrum、Optimism、Base、Avalanche、Solana、TRON
 - 原生代币 + ERC20/BEP20/SPL/TRC20 代币余额与转账
 - 原生币发送，动态 Gas 估算（慢 / 中 / 快 / 自定义）
+- 应用内兑换：Solana 链 Jupiter 路由，支持平台抽成线路
+- 赚币生息：流动性质押（JitoSOL / mSOL）实时 APY，质押与赎回走同一条交易流水线
+- dApp 连接：插件端 EIP-1193 + EIP-6963，移动端 WalletConnect v2
+- 硬件钱包：Ledger / OneKey（Ledger 兼容模式）通过 WebUSB 在 EVM 链签名
+- 合约转账内置 GoPlus 安全检测（貔貅 / 高税 / 增发风险警告）
 - 区块浏览器 API 查询交易历史
 - 加密保险库：AES-256-GCM + PBKDF2-SHA512（20 万次迭代）
 - 页面隐藏自动锁定（5 分钟），会话密钥仅存内存
@@ -67,7 +72,7 @@ Android 客户端使用 Expo / React Native，并复用同一套钱包核心和�
 移动端现已覆盖全部主网链（切换器以 TRON（TRX + USDT-TRC20）、BNB Chain、Solana、
 Ethereum 优先排列），展示各链适配器发现的代币余额，原生与代币转账走与 Web 端相同的
 链无关 intent 流水线；并支持可选的指纹/面容解锁（密码缓存由 Android Keystore 生物识别
-门锁保护，密码始终作为兜底通道）。解锁后的界面遵循主流钱包布局——底部四 Tab：资产 / 兑换 / dApp / 设置：应用内 Solana Jupiter 兑换、通过 WalletConnect v2 连接 dApp（扫码配对、逐请求人工审批；内置 relay 项目 ID，可用 EXPO_PUBLIC_WC_PROJECT_ID 覆盖）、以及基于 GitHub Releases 的应用内在线升级检查。
+门锁保护，密码始终作为兜底通道）。解锁后的界面遵循主流钱包布局——底部五 Tab：资产 / 兑换 / 赚币 / dApp / 设置：应用内 Solana Jupiter 兑换、流动性质押赚币生息（JitoSOL / mSOL，实时 APY 来自 Defillama，质押与赎回走同一条交易流水线）、通过 WalletConnect v2 连接 dApp（扫码配对、逐请求人工审批；内置 relay 项目 ID，可用 EXPO_PUBLIC_WC_PROJECT_ID 覆盖）、以及基于 GitHub Releases 的应用内在线升级检查。Web / 插件端同步上线 Earn 赚币页面。
 
 ### 浏览器插件
 

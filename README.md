@@ -15,6 +15,11 @@
 - Multi-chain unified asset view: Ethereum, BNB Chain, Polygon, Arbitrum, Optimism, Base, Avalanche, Solana, TRON
 - Native + ERC20/BEP20/SPL/TRC20 token balances and transfers
 - Send native tokens with dynamic gas estimation (slow / normal / fast / custom)
+- In-app swap: Jupiter-routed on Solana with platform-fee routing
+- Earn: liquid staking (JitoSOL / mSOL) with live APY — stake and redeem via the same pipeline
+- dApp connections: EIP-1193 + EIP-6963 (extension) and WalletConnect v2 (mobile)
+- Hardware wallets: Ledger / OneKey (Ledger-compatible) signing over WebUSB on EVM chains
+- GoPlus token-scan warnings on every contract send (honeypot / tax / mint risks)
 - Transaction history via block explorer APIs
 - Encrypted vault: AES-256-GCM + PBKDF2-SHA512 (200,000 iterations)
 - Auto-lock on tab hidden (5 min), session keys kept in memory only
@@ -71,7 +76,9 @@ token balances and sending native or token transfers through the same
 chain-agnostic intent pipeline as the web app. It also supports optional
 fingerprint / face unlock (Keystore-gated password cache with a password
 fallback). The unlocked app follows the mainstream wallet layout — a bottom
-tab bar with Assets · Swap · dApps · Settings: in-app Jupiter swaps on Solana,
+tab bar with Assets · Swap · Earn · dApps · Settings: in-app Jupiter swaps on Solana,
+liquid staking (JitoSOL / mSOL with live APY from Defillama — stake and
+redeem through the same pipeline),
 dApp connections over WalletConnect v2 (QR pairing, per-request human
 approval; ships with a built-in relay project id, overridable via
 EXPO_PUBLIC_WC_PROJECT_ID), and an in-app update

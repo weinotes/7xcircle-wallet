@@ -40,6 +40,7 @@
   "permissions": ["storage", "usb"],
   "host_permissions": [
     "https://lite-api.jup.ag/*",
+    "https://yields.llama.fi/*",
     "https://api.trongrid.io/*",
     "https://nile.trongrid.io/*",
     "https://api.gopluslabs.io/*",

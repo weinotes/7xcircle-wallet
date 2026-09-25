@@ -97,6 +97,7 @@ export default {
     noTransactions: 'No transactions yet',
     send: 'Send',
     swap: 'Swap',
+    earn: 'Earn',
     receive: 'Receive',
     history: 'History',
     dappRequests: 'dApp requests',
@@ -244,6 +245,25 @@ export default {
     accountN: 'Device account {{n}}',
     verifyOnDevice: 'Each added address is shown on the device screen for verification.',
     addSelected: 'Add selected accounts',
+  },
+
+  // ── Earn (liquid staking) ──
+  earn: {
+    title: 'Earn',
+    intro: 'Liquid staking — stake SOL to a yielding token and sell it back anytime. Holding it IS earning.',
+    noSolanaAccount: 'Staking currently runs on Solana — unlock a wallet with a Solana account to continue.',
+    holding: 'Holding: {{amount}} {{symbol}}',
+    stake: 'Stake SOL',
+    unstake: 'Unstake',
+    stakeAmount: 'Amount to stake (SOL)',
+    unstakeAmount: 'Amount to unstake ({{symbol}})',
+    confirmStake: 'Confirm stake',
+    confirmUnstake: 'Confirm unstake',
+    invalidAmount: 'Enter a valid positive amount',
+    tooMuchToUnstake: 'More than your current holding',
+    working: 'Transaction in flight…',
+    pending: 'Submitted — tracking in History',
+    done: 'Confirmed',
   },
 
   // ── Keys & recovery ──

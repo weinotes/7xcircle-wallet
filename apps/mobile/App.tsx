@@ -48,17 +48,19 @@ import {
 } from './src/biometric';
 import { Home } from './src/screens/Home';
 import { Swap } from './src/screens/Swap';
+import { Earn } from './src/screens/Earn';
 import { Dapps } from './src/screens/Dapps';
 import { Settings } from './src/screens/Settings';
 
 const VAULT_KEY = 'open-wallet-mobile-vault';
 
 type Screen = 'loading' | 'welcome' | 'create' | 'import' | 'password' | 'wallet';
-type Tab = 'home' | 'swap' | 'dapps' | 'settings';
+type Tab = 'home' | 'swap' | 'earn' | 'dapps' | 'settings';
 
 const TABS: Array<{ id: Tab; label: string; icon: string }> = [
   { id: 'home', label: 'Assets', icon: '💼' },
   { id: 'swap', label: 'Swap', icon: '⇄' },
+  { id: 'earn', label: 'Earn', icon: '💰' },
   { id: 'dapps', label: 'dApps', icon: '🌐' },
   { id: 'settings', label: 'Settings', icon: '⚙' },
 ];
@@ -203,6 +205,7 @@ export default function App() {
           <View style={{ flex: 1 }}>
             {tab === 'home' && <Home accounts={accounts} />}
             {tab === 'swap' && <Swap accounts={accounts} />}
+            {tab === 'earn' && <Earn accounts={accounts} />}
             {tab === 'dapps' && <Dapps accounts={accounts} locked={false} />}
             {tab === 'settings' && (
               <Settings vault={vault} bioStatus={bioStatus} bioEnabled={bioEnabled} onBioChanged={setBioEnabled} onLock={lock} />

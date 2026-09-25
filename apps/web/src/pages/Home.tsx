@@ -35,7 +35,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Lock, Send, ArrowLeftRight, ArrowDownToLine, History as HistoryIcon, Settings, ArrowUpRight, ArrowDownLeft, Coins, RefreshCw, Plug } from 'lucide-react';
+import { Lock, Send, ArrowLeftRight, TrendingUp, ArrowDownToLine, History as HistoryIcon, Settings, ArrowUpRight, ArrowDownLeft, Coins, RefreshCw, Plug } from 'lucide-react';
 import { Button } from '@open-wallet/ui';
 import { useWalletStore } from '../store/wallet.js';
 import { chainRegistry } from '@open-wallet/core';
@@ -292,6 +292,11 @@ export function Home() {
         <Link to="/swap" style={{ textDecoration: 'none' }}>
           <Button variant="secondary" style={{ width: '100%', flexDirection: 'column', padding: 'var(--ow-space-4)', gap: 'var(--ow-space-1)' }}>
             <ArrowLeftRight size={20} /> {t('home.swap')}
+          </Button>
+        </Link>
+        <Link to="/earn" style={{ textDecoration: 'none' }}>
+          <Button variant="secondary" style={{ width: '100%', flexDirection: 'column', padding: 'var(--ow-space-4)', gap: 'var(--ow-space-1)' }}>
+            <TrendingUp size={20} /> {t('home.earn')}
           </Button>
         </Link>
         <Link to="/receive" style={{ textDecoration: 'none' }}>

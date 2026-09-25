@@ -32,6 +32,7 @@ import { Unlock } from '@web/pages/Unlock.js';
 import { Home } from '@web/pages/Home.js';
 import { Send } from '@web/pages/Send.js';
 import { Swap } from '@web/pages/Swap.js';
+import { Earn } from '@web/pages/Earn.js';
 import { Receive } from '@web/pages/Receive.js';
 import { History } from '@web/pages/History.js';
 import { Settings } from '@web/pages/Settings.js';
@@ -108,6 +109,7 @@ function AppShell() {
       <Route path="/" element={<Home />} />
       <Route path="/send" element={<Send />} />
       <Route path="/swap" element={<Swap />} />
+      <Route path="/earn" element={<Earn />} />
       <Route path="/dapp" element={<DappApprovals />} />
       <Route path="/ledger" element={<LedgerConnect />} />
       <Route path="/receive" element={<Receive />} />

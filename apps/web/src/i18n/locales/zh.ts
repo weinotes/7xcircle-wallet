@@ -97,6 +97,7 @@ export default {
     noTransactions: '暂无交易',
     send: '发送',
     swap: '兑换',
+    earn: '赚币',
     receive: '收款',
     history: '历史',
     dappRequests: 'DApp 请求',
@@ -244,6 +245,25 @@ export default {
     accountN: '设备账户 {{n}}',
     verifyOnDevice: '每个添加的地址都会在设备屏幕上显示供核对。',
     addSelected: '添加所选账户',
+  },
+
+  // ── 赚币（流动性质押）──
+  earn: {
+    title: '赚币生息',
+    intro: '流动性质押——把 SOL 质押为生息代币，随时可换回；持有即生息。',
+    noSolanaAccount: '质押目前仅支持 Solana 链——请先解锁包含 Solana 账户的钱包。',
+    holding: '持有：{{amount}} {{symbol}}',
+    stake: '质押 SOL',
+    unstake: '赎回',
+    stakeAmount: '质押数量（SOL）',
+    unstakeAmount: '赎回数量（{{symbol}}）',
+    confirmStake: '确认质押',
+    confirmUnstake: '确认赎回',
+    invalidAmount: '请输入有效的正数金额',
+    tooMuchToUnstake: '超过当前持有量',
+    working: '交易进行中…',
+    pending: '已提交——可在历史记录中跟踪',
+    done: '已确认',
   },
 
   // ── 密钥与恢复 ──

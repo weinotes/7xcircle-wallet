@@ -22,6 +22,7 @@ import { Unlock } from './pages/Unlock.js';
 import { Home } from './pages/Home.js';
 import { Send } from './pages/Send.js';
 import { Swap } from './pages/Swap.js';
+import { Earn } from './pages/Earn.js';
 import { Receive } from './pages/Receive.js';
 import { History } from './pages/History.js';
 import { Settings } from './pages/Settings.js';
@@ -110,6 +111,7 @@ function App() {
       <Route path="/" element={<Home />} />
       <Route path="/send" element={<Send />} />
       <Route path="/swap" element={<Swap />} />
+      <Route path="/earn" element={<Earn />} />
       <Route path="/receive" element={<Receive />} />
       <Route path="/history" element={<History />} />
       <Route path="/settings" element={<Settings />} />
