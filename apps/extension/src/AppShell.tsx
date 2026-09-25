@@ -39,6 +39,7 @@ import { Settings } from '@web/pages/Settings.js';
 import { DappApprovals } from '@web/pages/DappApprovals.js';
 import { Approvals } from '@web/pages/Approvals.js';
 import { LedgerConnect } from '@web/pages/LedgerConnect.js';
+import { WatchWallet } from '@web/pages/WatchWallet.js';
 import { useWalletStore } from '@web/store/wallet.js';
 import { useThemeSync } from '@web/hooks/useThemeSync.js';
 import { registerAllChains } from '@7xcircle/chains';
@@ -92,10 +93,26 @@ function AppShell() {
       }
     };
 
-    document.addEventListener('visibilitychange', () => {
+    const handleVisibility = () => {
       if (document.visibilityState === 'hidden') handleHide();
       else handleShow();
-    });
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // Refresh lastActivityAt on real user interaction (throttled). Without
+    // this, the interval below locks a user who is actively typing/clicking,
+    // because `touchActivity` is otherwise only called on signing paths.
+    const THROTTLE_MS = 30_000;
+    let lastKeepalive = 0;
+    const handleInteraction = () => {
+      if (!useWalletStore.getState().unlocked) return;
+      const now = Date.now();
+      if (now - lastKeepalive < THROTTLE_MS) return;
+      lastKeepalive = now;
+      touchActivity();
+    };
+    document.addEventListener('pointerdown', handleInteraction, { passive: true });
+    document.addEventListener('keydown', handleInteraction);
 
     // SECURITY: Lock even when the popup stays visible but idle.
     inactivityInterval = setInterval(() => {
@@ -107,6 +124,9 @@ function AppShell() {
     }, INACTIVITY_CHECK_MS);
 
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      document.removeEventListener('pointerdown', handleInteraction);
+      document.removeEventListener('keydown', handleInteraction);
       if (lockTimer) clearTimeout(lockTimer);
       if (inactivityInterval) clearInterval(inactivityInterval);
     };
@@ -133,6 +153,7 @@ function AppShell() {
       <Route path="/receive" element={<Receive />} />
       <Route path="/history" element={<History />} />
       <Route path="/settings" element={<Settings />} />
+      <Route path="/watch" element={<WatchWallet />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

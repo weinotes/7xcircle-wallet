@@ -84,15 +84,32 @@ function App() {
       }
     };
 
-    document.addEventListener('visibilitychange', () => {
+    const handleVisibility = () => {
       if (document.visibilityState === 'hidden') handleHide();
       else handleShow();
-    });
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // Refresh lastActivityAt on real user interaction (throttled). Without
+    // this, the interval below locks a user who is actively typing/clicking,
+    // because `touchActivity` is otherwise only called on signing paths.
+    const THROTTLE_MS = 30_000;
+    let lastKeepalive = 0;
+    const handleInteraction = () => {
+      if (!useWalletStore.getState().unlocked) return;
+      const now = Date.now();
+      if (now - lastKeepalive < THROTTLE_MS) return;
+      lastKeepalive = now;
+      touchActivity();
+    };
+    document.addEventListener('pointerdown', handleInteraction, { passive: true });
+    document.addEventListener('keydown', handleInteraction);
 
     // SECURITY: The visibility-based lock above only fires when the user
     // switches away. A user who walks away with the tab still visible would
     // leave the wallet unlocked forever. This interval checks lastActivityAt
-    // every 30 s and locks if no interaction happened within AUTO_LOCK_MS.
+    // every 30 s and locks when nothing refreshed it within AUTO_LOCK_MS.
     inactivityInterval = setInterval(() => {
       if (!useWalletStore.getState().unlocked) return;
       const { lastActivityAt } = getSessionState();
@@ -102,6 +119,9 @@ function App() {
     }, INACTIVITY_CHECK_MS);
 
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      document.removeEventListener('pointerdown', handleInteraction);
+      document.removeEventListener('keydown', handleInteraction);
       if (lockTimer) clearTimeout(lockTimer);
       if (inactivityInterval) clearInterval(inactivityInterval);
     };
