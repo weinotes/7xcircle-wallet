@@ -32,7 +32,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate the Android project (expo prebuild)
-        run: pnpm --filter @7xcircle/mobile exec expo prebuild --platform android --yes
+        # SDK 53 flags: -p selects the platform, --no-install skips a second
+        # pnpm pass (deps are already installed above).
+        run: pnpm --filter @7xcircle/mobile exec expo prebuild -p android --no-install
 
       - name: Build the debug APK
         # Debug signing: installable for field testing without a release
