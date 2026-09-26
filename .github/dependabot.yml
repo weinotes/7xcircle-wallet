@@ -2,6 +2,12 @@
 # https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 
 version: 2
+# Version-update PRs are switched OFF (open-pull-requests-limit: 0): the
+# maintainer keeps a single-branch workflow and bumps dependencies
+# deliberately, one major at a time. Dependabot SECURITY updates are
+# independent of this limit and keep opening individually when an
+# advisory lands — that path stays live. Re-enable by raising the limit
+# when a recurring refresh cadence is ever wanted.
 updates:
   # npm dependencies (pnpm workspace)
   - package-ecosystem: "npm"
@@ -21,7 +27,7 @@ updates:
         update-types:
           - "patch"
     # Security updates are always opened individually regardless of groups
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 0
     labels:
       - "dependencies"
       - "automated"
@@ -34,6 +40,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    open-pull-requests-limit: 0
     labels:
       - "ci"
       - "automated"
