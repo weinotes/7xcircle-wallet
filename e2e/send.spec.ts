@@ -29,7 +29,7 @@ test.describe('Send page', () => {
   test.beforeEach(async ({ page }) => {
     await createWalletAndUnlock(page);
     // Full reload → the wallet re-locks; unlock again via the real screen
-    await page.goto('/send');
+    await page.goto('/app/send');
     await unlockWallet(page);
   });
 

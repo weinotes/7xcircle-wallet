@@ -42,7 +42,7 @@ const VERIFY_QUESTIONS = 3;
  * final assertion anchors on the Home quick-action grid.
  */
 export async function createWalletAndUnlock(page: Page): Promise<void> {
-  await page.goto('/');
+  await page.goto('/app');
   await page.getByTestId('onboarding-create').click();
 
   // Read the recovery phrase — the same 12 words the user is told to back up

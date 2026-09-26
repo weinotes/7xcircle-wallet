@@ -29,10 +29,10 @@ import { createWalletAndUnlock } from './helpers';
 
 test.describe('Onboarding — Create New Wallet', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app');
   });
 
-  test('landing page shows create and import options', async ({ page }) => {
+  test('wallet entry shows create and import options', async ({ page }) => {
     await expect(page.getByTestId('onboarding-create')).toBeVisible();
     await expect(page.getByTestId('onboarding-import')).toBeVisible();
   });
