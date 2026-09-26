@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Session-layer test matrix (`sessionMatrix.test.ts`): HD multi-account
+  unlock, all-hardened Solana indexes, `deriveMoreAccount` (add-account,
+  per-chain ceiling, key-vault refusal), mnemonic `getPrivateKey` paths,
+  unsupported-type refusals and the registry surface — lifts
+  `core/session.ts` from 72% to 98.6% line coverage.
+- Priced the untested half of `pricing/price.ts`: fetchers and the
+  `priceTokens` facade now run under a stubbed fetch (chunking at the
+  Jupiter-50 / DexScreener-30 caps, Jupiter→DexScreener fallthrough,
+  case-insensitive contract matching, identity-preserving "no price"
+  path) — 50% → 98% line coverage, repo statements now 84.5%.
 - Pre-sign transaction simulation: Send page now runs a pre-flight check
   via `eth_call` (EVM) / `simulateTransaction` (Solana) before the user
   signs. The confirm modal shows expected token changes and any warnings;
@@ -31,6 +41,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ethers v6 byte-for-byte; Ledger accounts get an honest decline).
 
 ### Fixed
+- CI: commit-lint checked the last-10 subjects as ONE grep blob (any single
+  conforming commit whitewashed the rest) — every commit in the pushed
+  range is now verified individually; Dependabot bots are exempt.
+- CI: secret-scan died with "Invalid revision range" on Dependabot PRs
+  because `event.before` can point at an unfetched orphan commit after a
+  bot force-push — candidate BASEs are now validated with
+  `git cat-file -e` before use, and `dependabot/**` pushes skip the
+  duplicate `push` trigger (pull_request still scans).
+- Toolchain: removed the last two deprecated `baseUrl` options (mobile +
+  scripts tsconfigs) that made every TypeScript 6 Dependabot bump fail
+  the build, re-opening the dependency-upgrade lane.
+- Lint: zero warnings. `exhaustive-deps` holes closed in Home/Send/
+  WatchWallet (optional-chain guards keep fetch dep lists precise while
+  satisfying the rule; `t` added where used), dead identifiers pruned
+  (Unlock navigate, LedgerConnect path helper, WatchWallet icon,
+  mobile Pressable).
 - Typed-data requests from dApps are order-tolerant on `[from, data]`
   params and refuse to sign for an account other than the connected one.
 - Mobile Swap goes multi-chain: an EVM route section gated on a build-time
