@@ -36,3 +36,6 @@ pnpm-debug.log*
 # OS
 Thumbs.db
 build-artifacts/
+.vercel-tmp/
+.vercel/
+.cf-tmp/
