@@ -28,7 +28,10 @@
  */
 
 import { useTranslation } from 'react-i18next';
+import { useEffect } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
+import i18n, { syncDocumentDirection } from '../i18n/index.js';
+import { useWalletStore } from '../store/wallet.js';
 import {
   ArrowLeftRight,
   Coins,
@@ -75,6 +78,15 @@ type FeatureIcon = ReactNode;
 
 export function Landing() {
   const { t } = useTranslation();
+  const language = useWalletStore(s => s.language);
+
+  // Same sync the wallet tree does (App.tsx): the persisted language — not
+  // just the browser locale — must drive copy and RTL direction here, or a
+  // user who picked English sees a Chinese landing over an English app.
+  useEffect(() => {
+    void i18n.changeLanguage(language);
+    syncDocumentDirection(language);
+  }, [language]);
 
   const features: Array<{ icon: FeatureIcon; t: string; d: string }> = [
     { icon: <Coins size={20} />, t: t('landing.f1t'), d: t('landing.f1d') },
