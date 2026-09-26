@@ -2,6 +2,15 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
+# React Native's Gradle codegen cannot resolve Expo's autolinked modules
+# through pnpm's symlinked (isolated) layout — the Android build dies with
+# "Unresolved reference 'NativeRNWalletConnectModuleSpec'" because the
+# generated specs never land. RN tooling expects a flat node_modules, and
+# selective hoisting patterns proved fragile; install everything hoisted
+# (Expo's documented pnpm mode). pnpm 11 reads this setting here, not from
+# .npmrc (verified: node-linker in .npmrc is silently ignored).
+nodeLinker: hoisted
+
 # Security overrides (pnpm 11 reads these here — the old `pnpm.overrides`
 # field in package.json is no longer read and was silently ignored).
 # Floors land on the first patched release of each advisory via transitive
