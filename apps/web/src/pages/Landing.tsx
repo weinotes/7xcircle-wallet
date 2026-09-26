@@ -16,20 +16,24 @@
 /**
  * Project landing page — served at `/`, the wallet app lives at `/app`.
  *
- * Marketing and tool are deliberately separate: visitors arriving from a
- * link meet the *project* (what it is, why trust it, where the code is),
- * and only click through into the create/import flow. Every claim here
- * must match verifiable behaviour — the same honesty bar as the README
- * (no future features advertised; fees and alpha status stated plainly).
+ * Visual language: Apple-keynote style — deep #09090B canvas, the 7X Circle
+ * brand gradient (indigo #6366F1 → purple #8B5CF6) as text fills, glows and
+ * pill shadows, glassmorphism sections, oversized centred type, scroll
+ * reveals. Fixed-dark by design (marketing surface); the wallet app under
+ * /app keeps the themeable --ow-* token system. See styles/landing.css.
+ *
+ * Content law (unchanged): every claim here must match shipped, verifiable
+ * behaviour — the same honesty bar as the README and the §0 monetization
+ * board. No EVM swap, no Marinade referral.
  *
  * The CTA is a real <a href="/app">, not a router <Link>: main.tsx picks
  * the wallet tree (BrowserRouter basename=/app) vs this landing tree at
- * mount time, so a client-side navigation would bypass that split.
+ * mount time, so the switch across trees MUST be a real reload.
  */
 
 import { useTranslation } from 'react-i18next';
-import { useEffect } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
+import { useEffect, useRef } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import i18n, { syncDocumentDirection } from '../i18n/index.js';
 import { useWalletStore } from '../store/wallet.js';
 import {
@@ -42,242 +46,167 @@ import {
   Usb,
   Wallet,
 } from 'lucide-react';
+import '../styles/landing.css';
 
 const GITHUB_URL = 'https://github.com/weinotes/7xcircle-wallet';
 const RELEASES_URL = `${GITHUB_URL}/releases/tag/v0.1.0`;
 
-const sectionStyle: CSSProperties = {
-  maxWidth: 980,
-  margin: '0 auto',
-  padding: '48px 24px',
-};
-
-const cardStyle: CSSProperties = {
-  display: 'flex',
-  gap: 12,
-  padding: 20,
-  borderRadius: 'var(--ow-radius-xl)',
-  border: '1px solid var(--ow-border-subtle)',
-  background: 'var(--ow-bg-secondary)',
-};
-
-const iconWrapStyle: CSSProperties = {
-  flex: 1,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  width: 40,
-  height: 40,
-  borderRadius: 'var(--ow-radius-md)',
-  background: 'var(--ow-bg-tertiary)',
-  color: 'var(--ow-accent)',
-};
-
-/** Feature icon slot — lucide elements are ReactNodes. */
 type FeatureIcon = ReactNode;
+
+/**
+ * One-shot scroll reveal: elements marked [data-ld-reveal] fade+rise in
+ * when they enter the viewport, then stop observing. CSS handles the
+ * prefers-reduced-motion escape hatch (reveals just appear).
+ */
+function useScrollReveal(rootRef: RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || typeof IntersectionObserver === 'undefined') return;
+    const targets = root.querySelectorAll<HTMLElement>('[data-ld-reveal]');
+    const observer = new IntersectionObserver(
+      entries => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('ld-shown');
+            observer.unobserve(entry.target);
+          }
+        }
+      },
+      { threshold: 0.12, rootMargin: '0px 0px -6% 0px' },
+    );
+    targets.forEach(t => observer.observe(t));
+    return () => observer.disconnect();
+  }, [rootRef]);
+}
 
 export function Landing() {
   const { t } = useTranslation();
   const language = useWalletStore(s => s.language);
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   // Same sync the wallet tree does (App.tsx): the persisted language — not
   // just the browser locale — must drive copy and RTL direction here, or a
-  // user who picked English sees a Chinese landing over an English app.
+  // user who picked English sees a Chinese landing over an English wallet.
   useEffect(() => {
     void i18n.changeLanguage(language);
     syncDocumentDirection(language);
   }, [language]);
 
+  useScrollReveal(rootRef);
+
   const features: Array<{ icon: FeatureIcon; t: string; d: string }> = [
-    { icon: <Coins size={20} />, t: t('landing.f1t'), d: t('landing.f1d') },
-    { icon: <KeyRound size={20} />, t: t('landing.f2t'), d: t('landing.f2d') },
-    { icon: <Plug size={20} />, t: t('landing.f3t'), d: t('landing.f3d') },
-    { icon: <ShieldCheck size={20} />, t: t('landing.f4t'), d: t('landing.f4d') },
-    { icon: <ArrowLeftRight size={20} />, t: t('landing.f5t'), d: t('landing.f5d') },
-    { icon: <Usb size={20} />, t: t('landing.f6t'), d: t('landing.f6d') },
+    { icon: <Coins size={22} />, t: t('landing.f1t'), d: t('landing.f1d') },
+    { icon: <KeyRound size={22} />, t: t('landing.f2t'), d: t('landing.f2d') },
+    { icon: <Plug size={22} />, t: t('landing.f3t'), d: t('landing.f3d') },
+    { icon: <ShieldCheck size={22} />, t: t('landing.f4t'), d: t('landing.f4d') },
+    { icon: <ArrowLeftRight size={22} />, t: t('landing.f5t'), d: t('landing.f5d') },
+    { icon: <Usb size={22} />, t: t('landing.f6t'), d: t('landing.f6d') },
   ];
 
   return (
-    <div style={{ minHeight: '100vh', color: 'var(--ow-text-primary)' }}>
-      {/* ── Top bar ── */}
-      <header
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px 24px',
-          borderBottom: '1px solid var(--ow-border-subtle)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
-          <Wallet size={20} color="var(--ow-accent)" />
-          <span>7xCircle Wallet</span>
-        </div>
-        <a
-          href={GITHUB_URL}
-          target="_blank"
-          rel="noreferrer"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            color: 'var(--ow-text-secondary)',
-            textDecoration: 'none',
-            fontSize: 'var(--ow-font-size-sm)',
-          }}
-        >
-          GitHub <ExternalLink size={14} />
-        </a>
-      </header>
-
-      {/* ── Hero ── */}
-      <section style={{ ...sectionStyle, textAlign: 'center', paddingTop: 72, paddingBottom: 56 }}>
-        <span
-          style={{
-            display: 'inline-block',
-            padding: '4px 12px',
-            borderRadius: 999,
-            border: '1px solid var(--ow-border)',
-            background: 'var(--ow-bg-tertiary)',
-            color: 'var(--ow-text-secondary)',
-            fontSize: 'var(--ow-font-size-xs)',
-            marginBottom: 20,
-          }}
-        >
-          {t('landing.badge')}
+    <div className="ld" ref={rootRef}>
+      {/* ── Sticky glass nav ── */}
+      <header className="ld-nav">
+        <span className="ld-nav-brand">
+          <Wallet size={19} className="ld-gradient-text" color="var(--ld-indigo)" />
+          7xCircle Wallet
         </span>
-        <h1 style={{ fontSize: 'clamp(28px, 5vw, 44px)', lineHeight: 1.2, margin: '0 auto 16px', maxWidth: 720 }}>
-          {t('landing.headline')}
-        </h1>
-        <p style={{ color: 'var(--ow-text-secondary)', maxWidth: 620, margin: '0 auto 32px', lineHeight: 1.6 }}>
-          {t('landing.sub')}
-        </p>
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <a
-            href="/app"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '12px 28px',
-              borderRadius: 'var(--ow-radius-md)',
-              background: 'var(--ow-accent)',
-              color: 'var(--ow-accent-fg)',
-              fontWeight: 700,
-              textDecoration: 'none',
-            }}
-          >
+        <nav className="ld-nav-actions">
+          <a className="ld-nav-link" href={GITHUB_URL} target="_blank" rel="noreferrer">
+            GitHub
+          </a>
+          <a className="ld-pill ld-pill-primary ld-pill-small" href="/app">
             {t('landing.ctaOpen')}
           </a>
-          <a
-            href={GITHUB_URL}
-            target="_blank"
-            rel="noreferrer"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '12px 28px',
-              borderRadius: 'var(--ow-radius-md)',
-              border: '1px solid var(--ow-border)',
-              color: 'var(--ow-text-primary)',
-              textDecoration: 'none',
-            }}
-          >
-            {t('landing.ctaGithub')} <ExternalLink size={14} />
-          </a>
-        </div>
-        <p style={{ color: 'var(--ow-text-tertiary)', fontSize: 'var(--ow-font-size-xs)', marginTop: 20 }}>
-          {t('landing.alphaWarn')}
-        </p>
-      </section>
+        </nav>
+      </header>
+
+      {/* ── Hero with ambient gradient glow ── */}
+      <div style={{ position: 'relative' }}>
+        <div className="ld-glow" aria-hidden="true" />
+        <section className="ld-wrap ld-hero">
+          <span className="ld-badge" data-ld-reveal>{t('landing.badge')}</span>
+          <h1 className="ld-gradient-text" data-ld-reveal style={{ transitionDelay: '60ms' }}>
+            {t('landing.headline')}
+          </h1>
+          <p className="ld-hero-sub" data-ld-reveal style={{ transitionDelay: '120ms' }}>
+            {t('landing.sub')}
+          </p>
+          <div className="ld-hero-cta" data-ld-reveal style={{ transitionDelay: '180ms' }}>
+            <a className="ld-pill ld-pill-primary" href="/app">
+              {t('landing.ctaOpen')}
+            </a>
+            <a className="ld-pill ld-pill-ghost" href={GITHUB_URL} target="_blank" rel="noreferrer">
+              {t('landing.ctaGithub')} <ExternalLink size={14} />
+            </a>
+          </div>
+          <p className="ld-hero-note" data-ld-reveal style={{ transitionDelay: '240ms' }}>
+            {t('landing.alphaWarn')}
+          </p>
+        </section>
+      </div>
 
       {/* ── Features ── */}
-      <section style={sectionStyle}>
-        <h2 style={{ textAlign: 'center', marginBottom: 28, color: 'var(--ow-text-primary)' }}>
-          {t('landing.featuresHead')}
-        </h2>
-        <div
-          style={{
-            display: 'grid',
-            gap: 14,
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          }}
-        >
-          {features.map(f => (
-            <div key={f.t} style={cardStyle}>
-              <span style={iconWrapStyle}>{f.icon}</span>
-              <div style={{ flex: 3 }}>
-                <div style={{ fontWeight: 700, marginBottom: 4 }}>{f.t}</div>
-                <div style={{ color: 'var(--ow-text-secondary)', fontSize: 'var(--ow-font-size-sm)', lineHeight: 1.5 }}>
-                  {f.d}
-                </div>
-              </div>
+      <section className="ld-wrap ld-section">
+        <h2 className="ld-section-title" data-ld-reveal>{t('landing.featuresHead')}</h2>
+        <div className="ld-grid">
+          {features.map((f, i) => (
+            <div key={f.t} className="ld-card" data-ld-reveal style={{ transitionDelay: `${i * 60}ms` }}>
+              <span className="ld-card-icon">{f.icon}</span>
+              <h3>{f.t}</h3>
+              <p>{f.d}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ── Trust ── */}
-      <section style={sectionStyle}>
-        <h2 style={{ textAlign: 'center', marginBottom: 24 }}>{t('landing.trustHead')}</h2>
-        <ul style={{ listStyle: 'none', padding: 0, margin: '0 auto', maxWidth: 640, display: 'grid', gap: 12 }}>
+      {/* ── Trust slab ── */}
+      <section className="ld-wrap ld-section" style={{ paddingTop: 0 }}>
+        <h2 className="ld-section-title" data-ld-reveal>{t('landing.trustHead')}</h2>
+        <div className="ld-trust" data-ld-reveal>
           {['landing.t1', 'landing.t2', 'landing.t3'].map(k => (
-            <li key={k} style={{ display: 'flex', gap: 10, alignItems: 'baseline', color: 'var(--ow-text-secondary)' }}>
-              <ShieldCheck size={16} color="var(--ow-accent)" style={{ flexShrink: 0, transform: 'translateY(2px)' }} />
+            <div key={k} className="ld-trust-item">
+              <ShieldCheck size={17} className="ld-trust-check" />
               <span>{t(k)}</span>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       </section>
 
       {/* ── Get / download ── */}
-      <section style={sectionStyle}>
-        <h2 style={{ textAlign: 'center', marginBottom: 24 }}>{t('landing.getHead')}</h2>
-        <div style={{ display: 'grid', gap: 14, gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
-          <div style={cardStyle}>
-            <div>
-              <div style={{ fontWeight: 700, marginBottom: 4 }}>{t('landing.getWeb')}</div>
-              <div style={{ color: 'var(--ow-text-secondary)', fontSize: 'var(--ow-font-size-sm)' }}>{t('landing.getWebD')}</div>
-              <a href="/app" style={{ display: 'inline-block', marginTop: 8, color: 'var(--ow-accent)', fontWeight: 700, textDecoration: 'none' }}>
-                {t('landing.ctaOpen')}
-              </a>
-            </div>
+      <section className="ld-wrap ld-section" style={{ paddingTop: 0 }}>
+        <h2 className="ld-section-title" data-ld-reveal>{t('landing.getHead')}</h2>
+        <div className="ld-grid">
+          <div className="ld-card" data-ld-reveal>
+            <h3>{t('landing.getWeb')}</h3>
+            <p>{t('landing.getWebD')}</p>
+            <a className="ld-get-link" href="/app">
+              {t('landing.ctaOpen')} <ExternalLink size={13} />
+            </a>
           </div>
-          <div style={cardStyle}>
-            <div>
-              <div style={{ fontWeight: 700, marginBottom: 4 }}>{t('landing.getAndroid')}</div>
-              <div style={{ color: 'var(--ow-text-secondary)', fontSize: 'var(--ow-font-size-sm)' }}>{t('landing.getAndroidD')}</div>
-              <a href={RELEASES_URL} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8, color: 'var(--ow-accent)', fontWeight: 700, textDecoration: 'none' }}>
-                v0.1.0 <ExternalLink size={13} />
-              </a>
-            </div>
+          <div className="ld-card" data-ld-reveal style={{ transitionDelay: '80ms' }}>
+            <h3>{t('landing.getAndroid')}</h3>
+            <p>{t('landing.getAndroidD')}</p>
+            <a className="ld-get-link" href={RELEASES_URL} target="_blank" rel="noreferrer">
+              v0.1.0 <ExternalLink size={13} />
+            </a>
           </div>
-          <div style={cardStyle}>
-            <div>
-              <div style={{ fontWeight: 700, marginBottom: 4 }}>{t('landing.getExt')}</div>
-              <div style={{ color: 'var(--ow-text-secondary)', fontSize: 'var(--ow-font-size-sm)' }}>{t('landing.getExtD')}</div>
-              <a href={`${GITHUB_URL}#browser-extension`} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8, color: 'var(--ow-accent)', fontWeight: 700, textDecoration: 'none' }}>
-                README <ExternalLink size={13} />
-              </a>
-            </div>
+          <div className="ld-card" data-ld-reveal style={{ transitionDelay: '160ms' }}>
+            <h3>{t('landing.getExt')}</h3>
+            <p>{t('landing.getExtD')}</p>
+            <a className="ld-get-link" href={`${GITHUB_URL}#browser-extension`} target="_blank" rel="noreferrer">
+              README <ExternalLink size={13} />
+            </a>
           </div>
         </div>
       </section>
 
       {/* ── Footer ── */}
-      <footer
-        style={{
-          borderTop: '1px solid var(--ow-border-subtle)',
-          padding: '24px',
-          textAlign: 'center',
-          color: 'var(--ow-text-tertiary)',
-          fontSize: 'var(--ow-font-size-xs)',
-        }}
-      >
-        {t('landing.footer')} · <a href={`${GITHUB_URL}/blob/main/LICENSE`} style={{ color: 'inherit' }}>Apache-2.0</a> ·{' '}
-        <a href={`${GITHUB_URL}/blob/main/SECURITY.md`} style={{ color: 'inherit' }}>SECURITY.md</a> ·{' '}
-        <a href={`${GITHUB_URL}/blob/main/CHANGELOG.md`} style={{ color: 'inherit' }}>CHANGELOG</a>
+      <footer className="ld-footer">
+        {t('landing.footer')} ·{' '}
+        <a href={`${GITHUB_URL}/blob/main/LICENSE`}>Apache-2.0</a> ·{' '}
+        <a href={`${GITHUB_URL}/blob/main/SECURITY.md`}>SECURITY.md</a> ·{' '}
+        <a href={`${GITHUB_URL}/blob/main/CHANGELOG.md`}>CHANGELOG</a>
       </footer>
     </div>
   );

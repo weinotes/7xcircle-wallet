@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Landing page redesigned in Apple-keynote style: deep #09090B canvas, the
+  7X Circle brand indigo→purple gradient on headline, pills and icon tiles,
+  sticky glass nav, ambient radial glow, glassmorphism cards and a wide
+  trust slab, staggered scroll reveals (reduced-motion honoured). Fixed
+  marketing-dark by design; the wallet under /app keeps the themeable
+  token system. Copy, links and i18n keys unchanged — all E2E assertions
+  still pass; live review caught and fixed a dead reveal animation
+  (CSS keyed on a class the components never set).
 - Project landing page at `/` — the public site now introduces the open-source
   project (feature grid, verifiability panel, download links for web/APK/
   extension, plain-language 0.5% fee disclosure and the alpha warning) before
