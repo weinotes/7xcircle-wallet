@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Mobile swap now carries the platform fee: the Android Swap tab mirrors
+  the web's monetization wiring — Jupiter `platformFeeBps` on the quote and
+  the fee wallet's derived ATA on the swap body (Solana), 0x
+  `swapFeeRecipient`/`swapFeeBps` on EVM quotes — gated by
+  `EXPO_PUBLIC_SWAP_FEE_WALLET(_EVM)`/`_BPS` build-time env with the same
+  invalid-value-drops-fee semantics as web (5 new config-gate unit tests;
+  CI-built APKs stay fee-off until envs are injected at build).
+- MONETIZATION.md §0: dated implementation-status board — every revenue
+  line scored on code path / build injection / actual receipts (all lines
+  are currently ZERO; Marinade's referral programme is frozen upstream AND
+  its router has no UI callers; TronSave has no ordering flow; the Solana
+  fee wallet itself was verified on-chain).
+
 ## [0.1.0] - 2026-09-26
 
 First public alpha. Multi-chain self-custodial wallet: web SPA, Chrome MV3
