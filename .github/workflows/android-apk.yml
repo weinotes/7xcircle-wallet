@@ -1,0 +1,52 @@
+name: Android APK
+
+# The dev machines don't carry an Android toolchain; GitHub's ubuntu-latest
+# runners do (SDK + build-tools preinstalled, JDK pinned below). This job
+# prebuilds the native project on the runner — apps/mobile/android is
+# intentionally NOT committed — produces an installable APK and uploads it
+# as a workflow artifact. Tag pushes under v* build automatically so a
+# Release can attach the APK; manual dispatch is for ad-hoc test builds.
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  apk:
+    name: Debug APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate the Android project (expo prebuild)
+        run: pnpm --filter @7xcircle/mobile exec expo prebuild --platform android --yes
+
+      - name: Build the debug APK
+        # Debug signing: installable for field testing without a release
+        # keystore. Release signing comes once the wallet keystore exists
+        # (see PRIVACY/release-secrets discussion) — do not ship release
+        # APKs signed with a debug key.
+        run: |
+          cd apps/mobile/android
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 7xcircle-wallet-android-v0-debug-apk
+          path: apps/mobile/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 30
