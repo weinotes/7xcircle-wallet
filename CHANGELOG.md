@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Project landing page at `/` — the public site now introduces the open-source
+  project (feature grid, verifiability panel, download links for web/APK/
+  extension, plain-language 0.5% fee disclosure and the alpha warning) before
+  one click into the wallet, which moved to `/app`. The split is done at
+  mount time (wallet tree gets `BrowserRouter basename=/app`, so every
+  existing page keeps its internal paths untouched); legacy deep links
+  hard-forward into `/app/*`. All copy in 6 locales; every claim verified
+  against shipped behaviour — EVM swap and Marinade are NOT advertised.
+  Three new Playwright specs pin the landing↔app boundary.
 - Mobile swap now carries the platform fee: the Android Swap tab mirrors
   the web's monetization wiring — Jupiter `platformFeeBps` on the quote and
   the fee wallet's derived ATA on the swap body (Solana), 0x
