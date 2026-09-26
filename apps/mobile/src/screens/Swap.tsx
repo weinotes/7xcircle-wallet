@@ -31,6 +31,7 @@ import { chainRegistry } from '@7xcircle/core';
 import {
   CHAIN_CONFIGS,
   SWAP_TOKEN_OPTIONS,
+  deriveFeeAccount,
   fetchQuote,
   fetchSwapTransaction,
   fetchZeroExQuote,
@@ -46,7 +47,13 @@ import { formatBalance, parseAmount } from '@7xcircle/shared';
 import type { Account } from '@7xcircle/shared';
 import { Button, shorten } from '../components';
 import { sendExternalTx, sendTx } from '../tx';
-import '../config';
+import {
+  EVM_FEE_ENABLED,
+  SWAP_FEE_BPS,
+  SWAP_FEE_ENABLED,
+  SWAP_FEE_WALLET,
+  SWAP_FEE_WALLET_EVM,
+} from '../config';
 import { styles } from '../theme';
 
 const SLIPPAGE_OPTIONS = [50, 100, 300];
@@ -152,7 +159,15 @@ export function Swap({ accounts }: { accounts: Account[] }) {
       if (active.kind === 'solana') {
         done(async () => {
           try {
-            const q = await fetchQuote({ inputMint: from.address, outputMint: to.address, amountRaw, slippageBps: slippage });
+            const q = await fetchQuote({
+              inputMint: from.address,
+              outputMint: to.address,
+              amountRaw,
+              slippageBps: slippage,
+              // Platform fee rides the quote only when both config halves are
+              // valid (see src/config.ts) — same gate as the web Swap.
+              ...(SWAP_FEE_ENABLED ? { platformFeeBps: SWAP_FEE_BPS } : {}),
+            });
             if (quoteSeq.current === seq) setJupQuote(q);
           } catch (e) {
             if (quoteSeq.current === seq) setQuoteError(e instanceof Error ? e.message : 'Quote failed');
@@ -168,6 +183,9 @@ export function Swap({ accounts }: { accounts: Account[] }) {
               sellAmountRaw: amountRaw,
               taker: account.address,
               slippageBps: slippage,
+              ...(EVM_FEE_ENABLED
+                ? { swapFeeRecipient: SWAP_FEE_WALLET_EVM, swapFeeBps: Math.min(SWAP_FEE_BPS, 1_000) }
+                : {}),
             });
             if (quoteSeq.current !== seq) return;
             if (q) setZxQuote(q);
@@ -223,7 +241,17 @@ export function Swap({ accounts }: { accounts: Account[] }) {
     setStatus('');
     try {
       if (active.kind === 'solana' && jupQuote) {
-        const txBase64 = await fetchSwapTransaction({ quote: jupQuote, userPublicKey: account.address });
+        // Jupiter routes the platform fee to the fee wallet's ATA for the
+        // input mint; derived here (not at quote time) so the swap body and
+        // the quote's platformFeeBps always name the same account.
+        const feeAccount = SWAP_FEE_ENABLED
+          ? await deriveFeeAccount(SWAP_FEE_WALLET, from.address)
+          : undefined;
+        const txBase64 = await fetchSwapTransaction({
+          quote: jupQuote,
+          userPublicKey: account.address,
+          ...(feeAccount ? { feeAccount } : {}),
+        });
         const hash = await sendExternalTx({
           adapter,
           account,
