@@ -5,20 +5,20 @@
   //
   // `paths` maps the workspace packages and the root-hoisted deps that pnpm
   // does not link into the root node_modules (tsx resolves them at runtime
-  // via .pnpm/node_modules, but tsc does not).
+  // via .pnpm/node_modules, but tsc does not). Entries are resolved relative
+  // to this file — `baseUrl` is deprecated in TypeScript 6 and must stay out.
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
-    "baseUrl": "..",
     "paths": {
-      "@7xcircle/shared": ["packages/shared/src/index.ts"],
-      "@7xcircle/core": ["packages/core/src/index.ts"],
-      "@7xcircle/chains": ["packages/chains/src/index.ts"],
-      "viem": ["packages/chains/node_modules/viem"],
-      "viem/accounts": ["packages/chains/node_modules/viem/accounts"],
-      "@solana/web3.js": ["packages/chains/node_modules/@solana/web3.js"],
-      "@solana/spl-token": ["packages/chains/node_modules/@solana/spl-token"],
-      "bs58": ["packages/chains/node_modules/bs58"]
+      "@7xcircle/shared": ["../packages/shared/src/index.ts"],
+      "@7xcircle/core": ["../packages/core/src/index.ts"],
+      "@7xcircle/chains": ["../packages/chains/src/index.ts"],
+      "viem": ["../packages/chains/node_modules/viem"],
+      "viem/accounts": ["../packages/chains/node_modules/viem/accounts"],
+      "@solana/web3.js": ["../packages/chains/node_modules/@solana/web3.js"],
+      "@solana/spl-token": ["../packages/chains/node_modules/@solana/spl-token"],
+      "bs58": ["../packages/chains/node_modules/bs58"]
     }
   },
   "include": ["**/*.ts"]
