@@ -2,22 +2,58 @@ name: CI
 
 on:
   push:
+    # Dependabot branches already run the same checks via `pull_request`;
+    # scanning the `push` too double-ran every bot commit (and the bot's
+    # `event.before` sha is often unfetchable after a force-update — see
+    # secret-scan's BASE resolution below).
+    branches-ignore:
+      - 'dependabot/**'
   pull_request:
     branches: [main]
 
 jobs:
   commit-lint:
     name: Conventional Commits
+    # Dependabot's security-update commits ("Bump X from Y to Z") are not
+    # conventional by design; humans are still held to the format.
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Check last 10 commits
+      - name: Check every commit in the pushed range
+        env:
+          PUSH_BEFORE: ${{ github.event.before }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           set -e
-          git log -10 --pretty=%s | grep -E '^(feat|fix|docs|refactor|chore|test|build|ci|perf|style|revert)(\(.+\))?: ' \
-            || { echo '❌ Commit message not in Conventional Commits format'; exit 1; }
+          # Resolve a BASE that actually exists as an object in this clone.
+          # `event.before` is all-zeros on a branch's first push and can point
+          # at an orphaned commit after a force-push — an unfetchable sha makes
+          # every git command against the range die with "Invalid revision
+          # range", which must not masquerade as a pass or a lint failure.
+          ZERO=0000000000000000000000000000000000000000
+          valid() { [ -n "$1" ] && [ "$1" != "$ZERO" ] && git cat-file -e "$1^{commit}" 2>/dev/null; }
+          BASE="$PUSH_BEFORE"
+          valid "$BASE" || BASE="$PR_BASE"
+          valid "$BASE" || BASE=$(git merge-base HEAD origin/main 2>/dev/null || true)
+          valid "$BASE" || BASE=$(git rev-parse HEAD~10 2>/dev/null || git rev-parse HEAD)
+          if [ "$BASE" = "$(git rev-parse HEAD)" ]; then RANGE='HEAD^1..HEAD'; else RANGE="$BASE..HEAD"; fi
+          echo "Linting commit subjects in $RANGE"
+          # Previously this grepped the last-10 subjects as one blob, so ANY
+          # conforming commit whitewashed nine non-conforming ones — including
+          # the newest push. Check every subject individually instead.
+          STATUS=0
+          while IFS= read -r subject; do
+            if echo "$subject" | grep -qE '^(feat|fix|docs|refactor|chore|test|build|ci|perf|style|revert)(\(.+\))?: '; then
+              echo "✅ $subject"
+            else
+              echo "❌ not in Conventional Commits format: $subject"
+              STATUS=1
+            fi
+          done < <(git log --no-merges --pretty=%s "$RANGE")
+          exit $STATUS
 
   secret-scan:
     name: Secret Scan
@@ -34,21 +70,23 @@ jobs:
           PUSH_BEFORE: ${{ github.event.before }}
           PR_BASE: ${{ github.event.pull_request.base.sha }}
         run: |
-          # `event.before` is all-zeros on a branch's first push; fall back to
-          # the PR base, then the merge-base with main, then HEAD (empty diff).
+          # Resolve a BASE that exists in this clone: `event.before` is
+          # all-zeros on a branch's first push and can point at a commit that
+          # was never fetched after a bot force-push — diffing against it dies
+          # with "Invalid revision range". Fall back to the PR base, the
+          # merge-base with main, then HEAD~5, then HEAD itself.
           ZERO=0000000000000000000000000000000000000000
+          valid() { [ -n "$1" ] && [ "$1" != "$ZERO" ] && git cat-file -e "$1^{commit}" 2>/dev/null; }
           BASE="$PUSH_BEFORE"
-          if [ -z "$BASE" ] || [ "$BASE" = "$ZERO" ]; then
-            BASE="$PR_BASE"
-          fi
-          if [ -z "$BASE" ] || [ "$BASE" = "$ZERO" ]; then
-            BASE=$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse --verify HEAD~5 2>/dev/null || git rev-parse HEAD)
-          fi
-          echo "Scanning ${BASE}..HEAD"
+          valid "$BASE" || BASE="$PR_BASE"
+          valid "$BASE" || BASE=$(git merge-base HEAD origin/main 2>/dev/null || true)
+          valid "$BASE" || BASE=$(git rev-parse HEAD~5 2>/dev/null || git rev-parse HEAD)
+          if [ "$BASE" = "$(git rev-parse HEAD)" ]; then RANGE='HEAD^1..HEAD'; else RANGE="$BASE..HEAD"; fi
+          echo "Scanning $RANGE"
           # Exclude test files (they contain known test vectors — tx hashes,
           # EIP-712 digests — that are 64-char hex but NOT secrets).
           # Also exclude lockfiles and node_modules.
-          DIFF=$(git diff "$BASE..HEAD" -- . \
+          DIFF=$(git diff "$RANGE" -- . \
             ':!node_modules' ':!pnpm-lock.yaml' \
             ':!*.test.*' ':!*.spec.*' \
             ':!scripts/*-test.ts' ':!scripts/ens-test.ts') \
