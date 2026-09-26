@@ -6,7 +6,12 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.1] - 2026-09-26
+
+Alpha follow-up: the Apple-keynote gradient UI lands across web, extension
+and (via shared styles) the app; mobile swaps now carry the platform fee
+when built with fee envs; the Chrome extension became actually installable
+(a manifest load-blocker was found and fixed).
 
 ### Changed
 - Wallet app UI adopts the Apple-keynote gradient language site-wide (was

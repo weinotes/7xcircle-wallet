@@ -2,7 +2,7 @@
   "expo": {
     "name": "7xCircle Wallet",
     "slug": "7xcircle-wallet",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "scheme": "7xcirclewallet",
