@@ -15,7 +15,7 @@
 
 | 收入线 | 代码链路 | 构建注入 | 实际收入 | 备注 |
 |---|---|---|---|---|
-| §3 Swap—Solana（Jupiter `platformFeeBps`） | ✅ 完整（web 2026-09 / mobile 2026-09-26 补齐接线，含 5 项门控单测） | ⚠ 仅本地 `apps/web/.env.local` 配了费钱包；Web 未部署，CI 构建的 APK 不注入任何费 env | ❌ 0 | 费钱包地址已链上核实存在（0.02 SOL，0 个 SPL 账户）；上线 Web 或给 APK 注入 env 即开始计收 |
+| §3 Swap—Solana（Jupiter `platformFeeBps`） | ✅ 完整（web 2026-09 / mobile 2026-09-26 补齐接线，含 5 项门控单测） | ✅ **已生效（2026-09-26）**：Web 已部署 Cloudflare Pages（`https://7xcircle-web.pages.dev`），构建仅注入 `VITE_SWAP_FEE_WALLET`，产物经 grep 验证无 0x/LI.FI key 残留；CI 构建的 APK 仍不注费 env | ⚠ 自部署时刻收 | 费钱包地址已链上核实存在；APK 要开费需在构建时注入 `EXPO_PUBLIC_SWAP_FEE_WALLET` |
 | §3 Swap—EVM（0x `swapFeeBps`） | ✅ 完整 | ❌ key 与 recipient 虽在本地配齐，但按 §8 前置要求需先建**薄网关**（否则 key 进 bundle 泄露） | ❌ 0 | 网关未建，公网构建默认关闭此线 |
 | §4 质押—Marinade mSOL 返佣 | ❌ **双断**：① Marinade 返佣计划已于 2026-05-08 冻结（`MARINADE_REFERRAL_ACTIVE = false`）；② 直连路由器 `fetchMarinadeRoute` 在 web/mobile/extension 三端**零调用**——Earn 页的 mSOL 实为 Jupiter 买卖路由，不产生返佣 | — | ❌ 0 | 即使申请到 code 也无收入路径；解冻或接线之前，本线在收入测算中应按 0 计 |
 | §4 质押—JitoSOL | ✅ Earn 流水线零抽成（设计选择，用户拿到全额 APY） | — | ❌ 0 | 若未来对 JitoSOL 路由加 platformFeeBps，归入 Swap 同一条费管道 |
@@ -23,7 +23,7 @@
 | §7 安全检测获客 | ✅ 已上线（GoPlus） | — | — | 获客引擎，本就不产生收入 |
 | §8 零工程量返佣（LI.FI 等） | ⚠ 仅数据源接入，无分润参数 | — | ❌ 0 | 「零工程量」同时意味着「零收入工程」，测算中按 0 计 |
 
-**让第一条真实收入成立的最小动作**：部署 Web（注入 `VITE_SWAP_FEE_WALLET`，不带 0x key）→ Jupiter Solana 抽成即生效。其余各线见 §8 前置与 §11 路线图的阻塞项。
+**首条收入线已上线（2026-09-26）**：Web 部署于 Cloudflare Pages，Solana Jupiter 抽成对线上用户即时生效——每一笔经本钱包的 Jupiter swap 按输入的 0.5% 直接进费钱包 ATA（链上完成，无后端参与）。APK 开费、0x 网关、TronSave 下单流见各自行的阻塞项。
 
 ---
 
