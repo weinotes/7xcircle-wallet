@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-26
+
+First public alpha. Multi-chain self-custodial wallet: web SPA, Chrome MV3
+extension (EIP-1193/6963 dApp provider) and Expo Android app (WalletConnect
+v2). Not audited — do not store significant funds.
+
 ### Added
 - Session-layer test matrix (`sessionMatrix.test.ts`): HD multi-account
   unlock, all-hardened Solana indexes, `deriveMoreAccount` (add-account,
