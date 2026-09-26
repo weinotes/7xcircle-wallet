@@ -26,7 +26,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Plus, Trash2, Eye, Copy, Check, ExternalLink, Loader2, Inbox } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Eye, Copy, Check, ExternalLink, Loader2 } from 'lucide-react';
 import { Button, Input, Card, EmptyState } from '@7xcircle/ui';
 import { useWalletStore, type WatchEntry } from '../store/wallet.js';
 import { CHAIN_CONFIGS } from '@7xcircle/chains';
@@ -139,7 +139,7 @@ export function WatchWallet() {
     }
 
     return () => { cancelled.current = true; };
-  }, [watchAddresses]);
+  }, [watchAddresses, t]);
 
   // ── Add handler ──
   const handleAdd = () => {

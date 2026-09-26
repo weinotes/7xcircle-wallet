@@ -140,7 +140,7 @@ export function toLedgerTxConfig(unsigned: Extract<UnsignedTx, { chainType: 'evm
 export function toViemSignature(
   sig: DeviceSignature,
   is1559: boolean,
-  chainId: number,
+  _chainId: number, // kept for call-site clarity; viem re-applies EIP-155 itself
 ): Signature {
   let v = BigInt(parseInt(sig.v.startsWith('0x') ? sig.v : '0x' + sig.v, 16));
   if (!is1559 && v >= 35n) {

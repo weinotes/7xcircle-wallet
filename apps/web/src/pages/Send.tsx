@@ -389,22 +389,25 @@ export function Send() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [tokenMode, erc20Address, adapter]);
+  }, [tokenMode, erc20Address, adapter, t]);
 
   // ── Load balance: native or token ───────────────────────────────────
   useEffect(() => {
-    if (!fromAccount || !adapter) return;
+    // Guards use optional chaining so the dep list can name `.address`
+    // instead of the whole account/tokenInfo object (re-created on
+    // unrelated store updates, which would re-trigger the balance fetch).
+    if (!adapter || !fromAccount?.address) return;
 
     if (tokenMode === 'native') {
       adapter.getNativeBalance(fromAccount.address)
         .then(b => setBalance(b))
         .catch(() => setBalance('0'));
-    } else if (tokenMode === 'erc20' && tokenInfo) {
+    } else if (tokenMode === 'erc20' && tokenInfo?.address) {
       adapter.getTokenBalance(fromAccount.address, tokenInfo.address)
         .then(b => setBalance(b))
         .catch(() => setBalance('0'));
     }
-  }, [fromAccount?.address, activeChainId, tokenMode, tokenInfo?.address]);
+  }, [adapter, fromAccount?.address, activeChainId, tokenMode, tokenInfo?.address]);
 
   // ── Validate amount format: must be "digits[.digits]" ──────────────
   const isValidAmountFormat = (v: string): boolean => {
@@ -509,7 +512,7 @@ export function Send() {
         setEstimateStatus('idle');
       }
     }
-  }, [toAddress, amount, adapter, fromAccount, activeChain, tokenMode, erc20Address, tokenInfo, sendToken, balance, tokenInfoLoading, tokenInfoError, feeTier]);
+  }, [toAddress, amount, adapter, fromAccount, activeChain, tokenMode, erc20Address, tokenInfo, sendToken, balance, tokenInfoLoading, tokenInfoError, feeTier, t]);
 
   // ── TRON energy advisory (TRC20 only) ──────────────────────────────
   /**

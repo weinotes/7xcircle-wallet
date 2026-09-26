@@ -34,7 +34,6 @@ import { useWalletStore } from '../store/wallet.js';
 import {
   browseLedgerAccounts,
   isHardwareAvailable,
-  ledgerEvmPath,
   openEthApp,
   type LedgerDiscoveredAccount,
 } from '../hw/ledger.js';

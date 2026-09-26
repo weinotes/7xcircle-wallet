@@ -95,7 +95,10 @@ export function Home() {
 
   // ── Fetch all token balances ──────────────────────────────────────
   const fetchTokens = useCallback(async () => {
-    if (!adapter || !currentAccount) return;
+    // Guard on `.address` (not the whole object) so the dependency array can
+    // stay `currentAccount?.address` — the account object is re-created on
+    // unrelated store updates and would re-trigger the fetch.
+    if (!adapter || !currentAccount?.address) return;
 
     setTokensLoading(true);
     setTokensError(null);

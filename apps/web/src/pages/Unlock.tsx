@@ -25,7 +25,6 @@
  */
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { KeyRound, Eye, EyeOff } from 'lucide-react';
 import { Button, Input } from '@7xcircle/ui';
@@ -39,7 +38,6 @@ export function Unlock() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const navigate = useNavigate();
   const unlock = useWalletStore(s => s.unlock);
   const clearVault = useWalletStore(s => s.clearVault);
 

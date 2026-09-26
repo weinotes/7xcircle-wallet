@@ -24,7 +24,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState, type ComponentType } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ScrollView, Text, TextInput, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import type { SignClientTypes, SessionTypes } from '@walletconnect/types';
 import { chainRegistry, getPrivateKey, signPersonalMessage } from '@7xcircle/core';
