@@ -139,6 +139,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # Fails closed if the built extension's manifest can't load in Chrome
+      # (missing _locales for default_locale, dangling file refs).
+      - run: pnpm exec tsx scripts/ext-manifest-check.ts
 
   coverage:
     name: Coverage

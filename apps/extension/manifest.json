@@ -3,7 +3,6 @@
   "name": "7xCircle Wallet",
   "version": "0.1.0",
   "description": "Open-source, self-custodial, multi-chain crypto wallet. Your keys, your coins.",
-  "default_locale": "en",
   "action": {
     "default_popup": "popup.html",
     "default_title": "7xCircle Wallet",

@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Extension load blocker (P0, found by the first automated Chrome smoke):
+  manifest declared `default_locale: "en"` but no `_locales/` directory
+  existed anywhere — Chrome refuses to install such an unpacked extension,
+  so the popup/provider could never load on any real browser despite green
+  builds. Dropped the unused declaration (zero `__MSG_` references) and
+  proved the fix end-to-end: with the rebuilt dist loaded in Chromium, a
+  probe page sees `window.ethereum` (+`isMetaMask`), receives the
+  `eip-6963` announce twice (load + requestProvider replay) and a silent
+  `eth_chainId` answers `0x38` through the inpage→content→background path.
+  New `scripts/ext-manifest-check.ts` (wired into the CI build job) fails
+  closed on missing `_locales`, dangling manifest file refs or unresolved
+  `__MSG_` placeholders, so this class of bug can never ship silently
+  again.
+
 ### Added
 - Landing page redesigned in Apple-keynote style: deep #09090B canvas, the
   7X Circle brand indigo→purple gradient on headline, pills and icon tiles,

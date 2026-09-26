@@ -39,3 +39,4 @@ build-artifacts/
 .vercel-tmp/
 .vercel/
 .cf-tmp/
+.ext-probe/
