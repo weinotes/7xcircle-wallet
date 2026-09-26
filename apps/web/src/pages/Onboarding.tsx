@@ -233,7 +233,10 @@ export function Onboarding() {
   if (step === 'choice') {
     return (
       <div style={cardStyle}>
-        <div style={titleStyle}>7xCircle Wallet</div>
+        <div className="ow-gradient-text" style={titleStyle}>7xCircle Wallet</div>
+        {/* Chromatic rule under the wordmark — carries the brand gradient
+            from the landing page into the app's front door. */}
+        <div aria-hidden="true" className="ow-gradient-bar" style={{ alignSelf: 'center', width: 72, margin: '2px 0 4px' }} />
         <div style={{ textAlign: 'center', color: 'var(--ow-text-secondary)' }}>
           {t('onboarding.slogan')}
         </div>

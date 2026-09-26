@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Wallet app UI adopts the Apple-keynote gradient language site-wide (was
+  a single-hue MetaMask blue on flat grey): new brand gradient tokens
+  (indigo → purple → light-purple, plus soft wash and chromatic-bar
+  variants) drive a gradient primary Button with a violet halo, Card
+  surfaces with a gradient wash and themed card shadows, an ambient
+  radial-glow body backdrop in BOTH themes, and gradient-text wordmark /
+  hero balance figures on Home and Onboarding. Dark canvas shifted to an
+  indigo cast, light theme to apple.com cool whites with accessible
+  indigo accents; every level keeps WCAG AA contrast. The extension
+  inherits all of it (it mounts the same @web pages and styles).
+
 ### Fixed
 - Extension load blocker (P0, found by the first automated Chrome smoke):
   manifest declared `default_locale: "en"` but no `_locales/` directory

@@ -59,34 +59,44 @@
   --ow-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
   --ow-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   --ow-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+  /* ── Brand gradients (Apple-keynote flavour, mirrors the landing page) ──
+   * The 7X Circle indigo → purple from the brandbook. Every surface that
+   * wants "colour" composes these instead of hardcoding stops; both themes
+   * share the same gradient identity. */
+  --ow-gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 55%, #c084fc 100%);
+  --ow-gradient-primary-soft: linear-gradient(160deg, rgba(99, 102, 241, 0.16) 0%, rgba(139, 92, 246, 0.07) 45%, rgba(192, 132, 252, 0) 100%);
+  --ow-gradient-bar: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
+  --ow-glow-accent: rgba(139, 92, 246, 0.35);
 }
 
-/* Dark theme (default) — Ledger-Live-style near-black canvas, MetaMask blue */
+/* Dark theme (default) — near-black canvas with an indigo cast; the accent
+   journey moved from single-hue MetaMask blue to the 7X Circle gradient. */
 :root,
 [data-theme='dark'] {
-  --ow-bg-primary: #0b0c0f;
-  --ow-bg-secondary: #16181d;
-  --ow-bg-tertiary: #1f2228;
-  --ow-bg-hover: #2b2f38;
+  --ow-bg-primary: #0a0a12;
+  --ow-bg-secondary: #15161f;
+  --ow-bg-tertiary: #1f2130;
+  --ow-bg-hover: #2b2d3f;
 
   --ow-text-primary: #ffffff;
   --ow-text-secondary: #a4aab3;
   /* Bumped so small secondary text — addresses, timestamps — meets WCAG AA
      on the card surfaces. */
   --ow-text-tertiary: #8b929c;
-  --ow-text-inverse: #0b0c0f;
+  --ow-text-inverse: #0a0a12;
 
-  --ow-border: #2b2f38;
-  --ow-border-subtle: #1f2228;
+  --ow-border: #30334a;
+  --ow-border-subtle: #23253a;
 
-  --ow-accent: #037dd6;
-  --ow-accent-hover: #4c8edf;
+  --ow-accent: #7c7ff2;
+  --ow-accent-hover: #9d8cff;
   --ow-accent-fg: #ffffff;
 
   --ow-success: #31c48d;
   --ow-warning: #f5a623;
   --ow-error: #ff6b76;
-  --ow-info: #4c8edf;
+  --ow-info: #8ea2ff;
 
   /* Badge/alert wash backgrounds — pages compose status chips with these
      instead of hand-rolling rgba(…, 0.12) tints. */
@@ -103,25 +113,29 @@
   --ow-pending: #f5a623;
   --ow-pending-fg: #f5a623;
   --ow-pending-bg: rgba(245, 166, 35, 0.14);
+
+  /* Cards float on a violet halo instead of a neutral black shadow. */
+  --ow-shadow-card: 0 10px 34px -14px rgba(99, 102, 241, 0.38);
 }
 
-/* Light theme */
+/* Light theme — same gradient identity, cooler whites (apple.com light)
+   and a much softer card glow so surfaces stay crisp on white. */
 [data-theme='light'] {
-  --ow-bg-primary: #ffffff;
-  --ow-bg-secondary: #f6f8fa;
-  --ow-bg-tertiary: #eaeef2;
-  --ow-bg-hover: #d0d7de;
+  --ow-bg-primary: #f5f5fd;
+  --ow-bg-secondary: #ffffff;
+  --ow-bg-tertiary: #ececf8;
+  --ow-bg-hover: #dfdfef;
 
-  --ow-text-primary: #1f2328;
-  --ow-text-secondary: #656d76;
-  --ow-text-tertiary: #8c959f;
+  --ow-text-primary: #1d1d1f;
+  --ow-text-secondary: #5f6276;
+  --ow-text-tertiary: #8b8fa5;
   --ow-text-inverse: #ffffff;
 
-  --ow-border: #d0d7de;
-  --ow-border-subtle: #eaeef2;
+  --ow-border: #d6d6e8;
+  --ow-border-subtle: #e6e6f2;
 
-  --ow-accent: #037dd6;
-  --ow-accent-hover: #0260a5;
+  --ow-accent: #5b5bd6;
+  --ow-accent-hover: #7a6cf0;
   --ow-accent-fg: #ffffff;
 
   --ow-success: #1a9e6a;
@@ -143,4 +157,6 @@
   --ow-pending: #b07508;
   --ow-pending-fg: #b07508;
   --ow-pending-bg: rgba(176, 117, 8, 0.12);
+
+  --ow-shadow-card: 0 10px 30px -16px rgba(91, 91, 214, 0.28);
 }

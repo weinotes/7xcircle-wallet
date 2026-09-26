@@ -352,7 +352,7 @@ export function Home() {
     <div className="ow-page">
       <header className="ow-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--ow-space-3)' }}>
-          <span style={{ fontSize: 'var(--ow-font-size-lg)', fontWeight: 700 }}>
+          <span className="ow-gradient-text" style={{ fontSize: 'var(--ow-font-size-lg)', fontWeight: 700 }}>
             7xCircle Wallet
           </span>
           {chainSelector}
@@ -450,7 +450,7 @@ export function Home() {
             <>
               {/* An unpriced portfolio shows a dash, never a $0.00 — and a
                   PARTIALLY priced one says how much is missing from the sum. */}
-              <div className="ow-mono" style={{ fontSize: 'var(--ow-font-size-3xl)', fontWeight: 700 }}>
+              <div className="ow-mono ow-gradient-text" style={{ fontSize: 'var(--ow-font-size-3xl)', fontWeight: 700 }}>
                 {portfolio.tokens.some(tok => tok.balanceUsd !== undefined)
                   ? formatUsd(totalUsd(portfolio.tokens))
                   : '—'}
@@ -569,7 +569,7 @@ export function Home() {
               <>
                 {/* USD portfolio total is what users actually scan for — make
                     it the big number; the native balance becomes a sub-line. */}
-                <div className="ow-mono" style={{ fontSize: 'var(--ow-font-size-3xl)', fontWeight: 700 }}>
+                <div className="ow-mono ow-gradient-text" style={{ fontSize: 'var(--ow-font-size-3xl)', fontWeight: 700 }}>
                   {formatUsd(portfolioUsd)}
                 </div>
                 <div className="ow-mono ow-muted" style={{ fontSize: 'var(--ow-font-size-sm)', marginTop: 'var(--ow-space-1)' }}>
@@ -579,7 +579,7 @@ export function Home() {
               </>
             ) : (
               <>
-                <div className="ow-mono" style={{ fontSize: 'var(--ow-font-size-3xl)', fontWeight: 700 }}>
+                <div className="ow-mono ow-gradient-text" style={{ fontSize: 'var(--ow-font-size-3xl)', fontWeight: 700 }}>
                   {nativeBal} <span style={{ fontSize: 'var(--ow-font-size-xl)' }}>{activeChain?.nativeSymbol}</span>
                 </div>
                 {native?.balanceUsd !== undefined && (

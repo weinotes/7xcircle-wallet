@@ -27,7 +27,12 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 
 const variantStyles: Record<ButtonVariant, React.CSSProperties> = {
   primary: {
+    // Brand gradient fill with a violet halo — the Apple-keynote pill from
+    // the landing page, now the app's default action. `backgroundColor`
+    // stays as a no-gradient fallback for print/old engines.
     backgroundColor: 'var(--ow-accent)',
+    backgroundImage: 'var(--ow-gradient-primary)',
+    boxShadow: '0 6px 22px -8px var(--ow-glow-accent)',
     color: 'var(--ow-accent-fg)',
     border: 'none',
   },
@@ -74,6 +79,8 @@ const SHEET_ID = 'ow-ui-button-styles';
 const BUTTON_CSS = `
 button.ow-button-base:focus-visible { outline: 2px solid var(--ow-accent); outline-offset: 2px; }
 button.ow-button-base:active:not(:disabled) { transform: translateY(1px); filter: brightness(0.92); }
+button.ow-button-base:not(:disabled):hover { filter: brightness(1.06); }
+button.ow-button-base[disabled] { filter: saturate(0.5); }
 `;
 function ensureButtonStyles(): void {
   if (typeof document === 'undefined' || document.getElementById(SHEET_ID)) return;

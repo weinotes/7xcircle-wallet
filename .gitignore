@@ -40,3 +40,4 @@ build-artifacts/
 .vercel/
 .cf-tmp/
 .ext-probe/
+.ui-probe/

@@ -70,9 +70,13 @@ export function Card({ centered, padded = true, style, children, ...rest }: Card
         display: 'flex',
         flexDirection: 'column',
         gap: 'var(--ow-space-2)',
+        // Solid secondary colour first, then the brand-gradient wash on top:
+        // a hairline of indigo light across otherwise flat surfaces.
         backgroundColor: 'var(--ow-bg-secondary)',
+        backgroundImage: 'var(--ow-gradient-primary-soft)',
         border: '1px solid var(--ow-border)',
         borderRadius: 'var(--ow-radius-xl)',
+        boxShadow: 'var(--ow-shadow-card)',
         padding: padded ? 'var(--ow-space-4) var(--ow-space-5)' : 0,
         textAlign: centered ? 'center' : undefined,
         alignItems: centered ? 'center' : undefined,

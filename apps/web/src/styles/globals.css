@@ -21,6 +21,13 @@ html, body, #root {
 
 body {
   background-color: var(--ow-bg-primary);
+  /* Ambient brand light: two fixed radial glows (indigo top-left, magenta
+     bottom-right) under every page — the Apple keynote backdrop, kept so
+     subtle it reads as colour depth rather than decoration. */
+  background-image:
+    radial-gradient(60rem 60rem at 8% -10%, rgba(99, 102, 241, 0.14), transparent 60%),
+    radial-gradient(50rem 50rem at 105% 110%, rgba(192, 132, 252, 0.10), transparent 55%);
+  background-attachment: fixed;
   color: var(--ow-text-primary);
   /* Multi-script font stack: covers Latin, CJK (ja/zh/ko) and Arabic */
   font-family: var(--ow-font-sans), 'Noto Sans SC', 'Noto Sans JP',
@@ -29,6 +36,14 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.5;
+}
+
+[data-theme='light'] body {
+  /* Light canvas needs a third stop or the glows vanish into white. */
+  background-image:
+    radial-gradient(60rem 60rem at 8% -10%, rgba(99, 102, 241, 0.10), transparent 60%),
+    radial-gradient(50rem 50rem at 105% 110%, rgba(236, 72, 153, 0.07), transparent 55%),
+    radial-gradient(40rem 40rem at 50% 120%, rgba(139, 92, 246, 0.06), transparent 60%);
 }
 
 /* Ensure monospace numbers/hashes render consistently across scripts */
@@ -120,8 +135,10 @@ a:hover {
 
 .ow-card {
   background-color: var(--ow-bg-secondary);
+  background-image: var(--ow-gradient-primary-soft);
   border: 1px solid var(--ow-border);
   border-radius: var(--ow-radius-xl);
+  box-shadow: var(--ow-shadow-card);
   padding: var(--ow-space-4) var(--ow-space-5);
   display: flex;
   flex-direction: column;
@@ -162,4 +179,25 @@ a:hover {
 .ow-label {
   font-size: var(--ow-font-size-sm);
   font-weight: var(--ow-font-weight-semibold);
+}
+
+/* ── Gradient utilities (Apple-style colour layer) ─────────────────── */
+
+/* Brand-gradient text fill for hero figures and page titles. Callers keep
+   their own size/weight; keep contrast in mind before applying it to body
+   copy. */
+.ow-gradient-text {
+  background: var(--ow-gradient-primary);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Thin chromatic rule for section headers — self-sizing, fill via flex. */
+.ow-gradient-bar {
+  height: 3px;
+  border: none;
+  border-radius: var(--ow-radius-full);
+  background: var(--ow-gradient-bar);
+  opacity: 0.85;
 }
