@@ -468,6 +468,95 @@ export const CHAIN_CONFIGS: ChainConfig[] = [
 - [ ] 依赖供应链安全（`pnpm audit` + Renovate）
 - [ ] 公开安全漏洞奖励计划（HackerOne 或邮箱）
 
+### 7.1 威胁模型（STRIDE）
+
+> 上面 §7 是「要做的事」，本节是「**为什么**要做这些事、靠什么挡住、以及如何验证真的挡住了」。
+> 没有验证方式的对策不算对策 —— 那只是一句愿望。
+
+#### 7.1.1 信任边界
+
+```
+不可信 ───────────────────────────────────────────────────▶ 可信
+
+┌───────────┐  postMessage  ┌────────────┐  sendMessage  ┌────────────┐  port  ┌──────────┐
+│   网页     │ ────────────▶ │  content   │ ────────────▶ │ background │ ─────▶ │  popup   │
+│（任意 dApp）│              │   script   │               │  (SW)      │        │ （持钥）  │
+│           │ ◀──────────── │ （仅中继）   │ ◀──────────── │            │ ◀───── │          │
+└───────────┘               └────────────┘               └────────────┘        └──────────┘
+      ▲                            ▲                            ▲
+ 任何人可注入代码            页面可伪造 postMessage        不持有密钥
+ 若走 http 可被中间人篡改      source 校验是唯一防线        只裁决、只路由
+```
+
+**三条关键不变式**（任何改动都不得破坏）：
+
+1. 助记词与私钥**只存在于 popup 的内存会话**中 —— 从不进入 `chrome.storage`、background、content script 或 Zustand 持久化
+2. `background` **不 import 任何密钥模块** —— 它只做裁决（`gate()`）与路由
+3. 无 grant 时 `eth_accounts` 返回 `[]`，签名/发送类方法一律拒绝
+
+#### 7.1.2 STRIDE 分析
+
+| # | 威胁 | 具体攻击场景 | 影响 | 对策 | 验证方式 |
+|---|---|---|---|---|---|
+| **S1** | 仿冒 | 恶意页面冒充一个已获授权的 dApp 发起请求 | 用户以为在跟可信站点交互 | origin 由 `sender.url` 在 background 侧解析，**不采信页面自报的身份** | `packages/core/src/dapp/protocol.test.ts` —「grant does not leak across origins」 |
+| **S2** | 仿冒 | 页面伪造 `window.postMessage` 冒充注入的 provider | 绕过 content script 直达 background | content script 校验 `event.source === window` **且** `data.source === '7xcircle-inpage'` | `apps/extension/src/content.test.ts` |
+| **S3** | 仿冒 | 明文 http 页面（可被中间人改写）向钱包发起请求 | 用户批准的是一个他从未真正看到内容的 origin | `originOf` 只接受 `https:`，`http:` 仅限 `localhost` / `127.0.0.1` / `[::1]` | `apps/extension/src/background.test.ts` —「rejects plaintext http origins that are not loopback」 |
+| **T1** | 篡改 | 中间人改写 dApp 的 RPC 请求或响应 | 用户签下非本意的内容 | 传输强制 https；页面↔扩展走 Chrome 内部消息，不经网络 | 同上 S3；`manifest.json` 的 `content_scripts.matches` 仍含 `http://*/*`，见 §7.1.4 |
+| **T2** | 篡改 | 直接改写存储中的 vault 密文 | 解密出错误助记词 | AES-256-GCM 认证加密，认证标签校验失败即拒绝 | `packages/core/src/vault/encryption.test.ts` |
+| **T3** | 篡改 | 篡改排队中的待批准请求 | 用户批准的与实际执行的不一致 | 请求只在 background 内存与 popup port 之间传递，不落盘、不经过页面 | 人工审查（无自动测试） |
+| **R1** | 抵赖 | 用户否认曾授权某 dApp | 无法举证 | 权限台账含 `grantedAt` 并持久化 | `protocol.test.ts` —「permission ledger」 |
+| **I1** | 信息泄露 | 未授权站点读取用户地址做指纹 | 隐私泄露 | 无 grant 时 `eth_accounts` 返回 `[]`（EIP-1102）；地址快照与权限是两份独立数据 | `background.test.ts` —「returns [] for an origin that was never granted, even if addresses are on file」 |
+| **I2** | 信息泄露 | 助记词经持久化或日志外泄 | 资产全失 | 会话仅在内存；Zustand `partialize` 显式排除 `unlocked` / `accounts`；无远程日志上报 | `apps/web/src/store/wallet.ts` 头部 SECURITY NOTE + 人工审查 |
+| **I3** | 信息泄露 | 私钥残留在内存中被其他进程读取 | 资产全失 | 取用后立即 `privateKey.fill(0)` | 人工审查（内存残留无法自动断言） |
+| **I4** | 信息泄露 | 恶意 dApp 借超长 payload 做指纹或卡死弹窗 | 隐私 / 可用性 | `previewParams` 截断至 800 字符并容忍循环引用 | `protocol.test.ts` —「truncates enormous payloads and survives circular junk」 |
+| **D1** | 拒绝服务 | dApp 洪水式请求刷爆待批准队列 | 钱包无响应 | 只读方法静默应答不进队列；签名类必须用户逐条批准；SW 重启即清空内存队列 | 部分覆盖（队列本身无上限，见 §7.1.4） |
+| **D2** | 拒绝服务 | 请求挂死，占住 `sendResponse` 直至 Chrome 断开 | dApp 永久挂起 | 4 分钟超时兜底，超时回 `4900 disconnected` | 人工审查（建议补测试，见 §7.1.4） |
+| **E1** | 提权 | 未授权站点直接调用签名/发送 | 资产全失 | `gate()`：sign / send / admin 无 grant 一律 `4100` 拒绝 | `protocol.test.ts` —「sign/send prompt ONLY with a grant — never for strangers」 |
+| **E2** | 提权 | 已授权站点在未获批的链上发起交易 | 在错误链上执行 | grant 绑定 `chainIds`，不匹配返回 `4901` | `protocol.test.ts` —「grant does not leak across chains」 |
+| **E3** | 提权 | 利用 `eth_sign` 签署任意 32 字节哈希（空白支票） | 可签出任意交易 | `eth_sign` 硬编码为 `unsupported`，永不进入签名路径 | `protocol.test.ts` + `background.test.ts` —「keeps eth_sign unsupported」 |
+| **E4** | 提权 | 钱包锁定时批准待处理请求 | 未解锁即可签名 | popup 侧 `rejectAllLocked` + 批准按钮 `disabled`；broker 只「停车」不放行 | 人工审查（无自动测试） |
+
+#### 7.1.3 对策的回归防护现状
+
+> 这张表回答「哪些防线一旦被改坏会被 CI 立刻发现」。空白处就是当前的裸露面。
+
+| 防线 | 有自动测试 | 仅人工审查 |
+|---|---|---|
+| origin 解析与 scheme 白名单 | ✅ `background.test.ts` | |
+| `eth_accounts` 无授权返回 `[]` | ✅ `background.test.ts` | |
+| content script source 校验 | ✅ `content.test.ts` | |
+| 权限台账（授权/撤销/跨源不泄露） | ✅ `protocol.test.ts` | |
+| 链绑定（跨链不泄露） | ✅ `protocol.test.ts` | |
+| `eth_sign` 不可达 | ✅ 两处 | |
+| vault 认证加密 | ✅ `encryption.test.ts` | |
+| 私钥用后擦除 | | ⚠️ `DappApprovals.tsx` / `signFor.ts` |
+| 请求不落盘 | | ⚠️ `background.ts` pending 队列 |
+| 4 分钟超时兜底 | | ⚠️ `background.ts` |
+| 锁定时拒绝批准 | | ⚠️ `DappApprovals.tsx` |
+| Zustand 不持久化密钥 | | ⚠️ `store/wallet.ts` |
+
+#### 7.1.4 已知接受的风险
+
+记录在此，是为了让它们是**明确的决定**，而不是没人注意到的漏洞。
+
+| 风险 | 说明 | 为何接受 |
+|---|---|---|
+| `manifest.json` 的 `content_scripts.matches` 仍为 `http://*/*` | content script 仍会注入到 http 页面，但**任何请求都会被 background 拒绝**（S3） | 安全性由 background 的 origin 判定保证；收窄 manifest 会导致 http 页面连 `window.ethereum` 都不存在，反而让部分 dApp 报错更难排查。**若要求更严格，应一并收窄** |
+| 无不可篡改的审计日志 | 本机用户可修改 `chrome.storage` 中的授权记录 | 非托管钱包中用户即资产所有者，抵赖风险无实际对手方 |
+| 待批准队列无长度上限 | 理论上可被洪水请求耗尽内存 | SW 是短生命周期的，重启即清空；实际影响有限。**若成为问题，应加队列上限** |
+| 4 分钟超时兜底无自动测试 | 定时器行为依赖 SW 生命周期 | 测试成本高于收益，暂以人工审查覆盖 |
+| 无第三方安全审计 | 未经专业机构审计 | 项目处于 alpha，SECURITY.md 已明确「勿存大额资金」 |
+
+#### 7.1.5 变更纪律
+
+以下任一改动**必须**回来更新本节，否则视为引入未评估的攻击面：
+
+- 新增任何 EIP-1193 方法（改 `METHOD_TIERS`）
+- 改动 `originOf` 的 scheme / host 白名单
+- 让 `background` 接触任何密钥或会话 API
+- 新增 popup ↔ background 的消息类型
+- 向 `chrome.storage` 写入新的数据类型
+
 ---
 
 ## 8. 开发路线图
