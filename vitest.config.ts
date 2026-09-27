@@ -74,12 +74,40 @@ export default defineConfig({
         'packages/chains/src/tron/adapter.ts',
       ],
       reporter: ['text', 'text-summary', 'lcov'],
-      // Minimum coverage thresholds — CI fails if below these
+      // Minimum coverage thresholds — CI fails if below these.
+      //
+      // Floors sit ~4-6pp under the measured numbers (2026-09-27) so they catch
+      // a real regression without turning a small refactor red. The previous
+      // single 60/50 pair was far *below* what the repo already achieved
+      // (84.7% lines / 86.6% branches), so it could never fire and guarded
+      // nothing. Per-package floors exist because core (keys, vault, session)
+      // and chains (adapters, pricing) carry very different risk.
+      //
+      // Changing these is checked by scripts/gate-selfcheck.ts, which refuses
+      // to let a floor be lowered without the change being visible.
       thresholds: {
-        lines: 60,
-        functions: 60,
-        branches: 50,
-        statements: 60,
+        lines: 78,
+        functions: 75,
+        branches: 78,
+        statements: 78,
+        'packages/core/src/**': {
+          lines: 90,
+          functions: 85,
+          branches: 88,
+          statements: 90,
+        },
+        'packages/shared/src/**': {
+          lines: 90,
+          functions: 90,
+          branches: 86,
+          statements: 90,
+        },
+        'packages/chains/src/**': {
+          lines: 75,
+          functions: 75,
+          branches: 80,
+          statements: 75,
+        },
       },
     },
   },

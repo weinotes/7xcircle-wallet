@@ -25,6 +25,7 @@ import { describe, it, expect } from 'vitest';
 import {
   encryptVault,
   decryptVault,
+  deriveSessionKey,
   evaluatePassword,
 } from './encryption.js';
 
@@ -118,5 +119,39 @@ describe('evaluatePassword', () => {
     const r = evaluatePassword('UPPERCASE123');
     expect(r.errors).toContain('Include at least one lowercase letter');
     expect(r.score).toBeLessThan(4);
+  });
+
+  it('flags a missing uppercase letter while still scoring 4/4', () => {
+    // There are five scoring points and the cap is four, so a long password
+    // that is missing exactly one character class still reads as strong. This
+    // test pins that as intended rather than accidental: it should only change
+    // if the policy changes.
+    const r = evaluatePassword('lowercase123!');
+    expect(r.errors).toContain('Include at least one uppercase letter');
+    expect(r.score).toBe(4);
+  });
+
+  it('flags a missing digit while still scoring 4/4', () => {
+    const r = evaluatePassword('NoDigitsHere!');
+    expect(r.errors).toContain('Include at least one number');
+    expect(r.score).toBe(4);
+  });
+
+  it('drops below strong once two classes are missing', () => {
+    const r = evaluatePassword('alllowercase!!'); // no uppercase, no digit
+    expect(r.errors).toContain('Include at least one uppercase letter');
+    expect(r.errors).toContain('Include at least one number');
+    expect(r.score).toBeLessThan(4);
+  });
+});
+
+describe('deriveSessionKey', () => {
+  it('derives a non-exportable AES-256-GCM key for the session', async () => {
+    const key = await deriveSessionKey(PASSWORD, new Uint8Array(16).fill(3));
+    expect(key.algorithm).toMatchObject({ name: 'AES-GCM', length: 256 });
+    expect(key.usages).toEqual(['encrypt', 'decrypt']);
+    // The whole point of a session key is that it cannot be lifted back out
+    // with crypto.subtle.exportKey.
+    expect(key.extractable).toBe(false);
   });
 });
