@@ -99,13 +99,23 @@ async function broadcastEvent(event: string, data: unknown): Promise<void> {
   }
 }
 
+/** Plaintext http is tolerated for loopback only — see originOf below. */
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
 function originOf(sender: chrome.runtime.MessageSender): string | null {
   if (!sender.url) return null;
   try {
     const url = new URL(sender.url);
-    // only http(s) pages may talk to the wallet
-    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
-    return url.origin;
+    // SECURITY: the origin computed here is the dApp's whole identity — the
+    // grant ledger is keyed on it and the user's approval prompt names it.
+    // So it must come from a transport the page cannot be rewritten in.
+    // https qualifies. Plaintext http does not: anything between the browser
+    // and the server can inject RPC calls, and the user would be approving an
+    // origin whose content they never saw. Loopback is the one exception
+    // (local dApp development, no network hop to intercept).
+    if (url.protocol === 'https:') return url.origin;
+    if (url.protocol === 'http:' && LOOPBACK_HOSTS.has(url.hostname)) return url.origin;
+    return null;
   } catch {
     return null;
   }

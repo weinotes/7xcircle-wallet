@@ -164,6 +164,20 @@ describe('background origin gate', () => {
     }
   });
 
+  it('rejects plaintext http origins that are not loopback', async () => {
+    // A page served over http can be rewritten in transit, so anything it asks
+    // the wallet to do is attacker-influenced. Only loopback escapes this.
+    const stub = await loadBroker({ [KEYS.chainId]: ACTIVE_CHAIN });
+    for (const url of [
+      'http://app.example/swap',
+      'http://192.168.1.10:8080/',
+      'http://10.0.0.5/',
+      'http://localhost.evil.example/', // suffix, not loopback
+    ]) {
+      const res = await callRpc(stub, 'eth_chainId', url);
+      expect(res.error, `expected ${url} to be refused`).toMatchObject({ code: 4100 });
+    }
+  });
 });
 
 describe('background silent answers', () => {
