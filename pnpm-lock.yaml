@@ -117,6 +117,9 @@ importers:
       vite:
         specifier: ^6.0.0
         version: 6.4.3(@types/node@22.20.1)(lightningcss@1.27.0)(terser@5.51.2)(tsx@4.23.13)
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.0(@types/node@22.20.1)(lightningcss@1.27.0)(terser@5.51.2)
 
   apps/mobile:
     dependencies:
